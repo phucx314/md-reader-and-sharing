@@ -32,6 +32,8 @@ async def create_share_link(
     expires_in_hours: Optional[int] = Form(None),
     is_anonymous: bool = Form(False),
     overwrite: bool = Form(False),
+    force_new: bool = Form(False),
+    local_file_id: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -41,6 +43,67 @@ async def create_share_link(
 
     if current_user.id is None:
         raise HTTPException(status_code=401, detail="Invalid user")
+
+    now = datetime.now(timezone.utc)
+    
+    # Calculate the target expiration hours for the new link
+    target_exp_hours = expires_in_hours if expires_in_hours else None
+
+    # Helper function to check if an existing link matches the requested settings
+    def is_same_settings(link: ShareLink) -> bool:
+        if link.original_filename != filename:
+            return False
+        if link.is_anonymous != is_anonymous:
+            return False
+        if target_exp_hours is None:
+            return link.expires_at is None
+        if link.expires_at is None:
+            return False
+        # Calculate original expiry hours
+        diff = (link.expires_at - link.created_at).total_seconds() / 3600
+        return round(diff) == target_exp_hours
+
+    # Base query for existing links of this user
+    query = select(ShareLink).where(ShareLink.user_id == current_user.id)
+    if local_file_id:
+        query = query.where(ShareLink.local_file_id == local_file_id)
+    else:
+        query = query.where(ShareLink.original_filename == filename)
+
+    # Only check for duplicates if NOT overwrite and NOT force_new
+    if not overwrite and not force_new:
+        existing_links = session.exec(query.order_by(ShareLink.created_at.desc())).all()
+
+        existing_link = next((el for el in existing_links if is_same_settings(el)), None)
+
+        if existing_link:
+            is_expired = False
+            if existing_link.expires_at:
+                exp = existing_link.expires_at.replace(tzinfo=timezone.utc) if existing_link.expires_at.tzinfo is None else existing_link.expires_at
+                if exp < now:
+                    is_expired = True
+            
+            if not is_expired:
+                import json
+                base_url = str(request.base_url).rstrip("/")
+                detail_dict = json.loads(ShareLinkRead(**existing_link.dict(), url=f"{base_url}/view/{existing_link.token}").json())
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=detail_dict
+                )
+    
+    # If overwrite is True, delete existing links with the SAME EXACT settings
+    if overwrite:
+        existing_links = session.exec(query).all()
+        for el in existing_links:
+            if is_same_settings(el):
+                if os.path.exists(el.file_path):
+                    try:
+                        os.remove(el.file_path)
+                    except Exception:
+                        pass
+                session.delete(el)
+        session.commit()
 
     token = str(uuid.uuid4())
     file_ext = os.path.splitext(filename)[1]
@@ -53,57 +116,14 @@ async def create_share_link(
 
     expires_at = None
     if expires_in_hours:
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)
-
-    now = datetime.now(timezone.utc)
-    
-    if not overwrite:
-        existing_link = session.exec(
-            select(ShareLink)
-            .where(
-                ShareLink.user_id == current_user.id,
-                ShareLink.original_filename == filename,
-                ShareLink.is_anonymous == is_anonymous
-            )
-            .order_by(ShareLink.created_at.desc())
-        ).first()
-
-        if existing_link:
-            is_expired = False
-            if existing_link.expires_at:
-                exp = existing_link.expires_at.replace(tzinfo=timezone.utc) if existing_link.expires_at.tzinfo is None else existing_link.expires_at
-                if exp < now:
-                    is_expired = True
-            
-            if not is_expired:
-                base_url = str(request.base_url).rstrip("/")
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=ShareLinkRead(**existing_link.dict(), url=f"{base_url}/view/{existing_link.token}").dict()
-                )
-    else:
-        existing_links = session.exec(
-            select(ShareLink)
-            .where(
-                ShareLink.user_id == current_user.id,
-                ShareLink.original_filename == filename,
-                ShareLink.is_anonymous == is_anonymous
-            )
-        ).all()
-        for el in existing_links:
-            if os.path.exists(el.file_path):
-                try:
-                    os.remove(el.file_path)
-                except Exception:
-                    pass
-            session.delete(el)
-        session.commit()
+        expires_at = now + timedelta(hours=expires_in_hours)
 
     share_link = ShareLink(
         token=token,
         user_id=current_user.id,
         file_path=file_path,
         original_filename=filename,
+        local_file_id=local_file_id,
         is_anonymous=is_anonymous,
         expires_at=expires_at,
     )
@@ -121,24 +141,16 @@ def get_my_links(
     request: Request,
     skip: int = 0,
     limit: int = 10,
-    filename: Optional[str] = None,
-    fallback: Optional[str] = None,
+    local_file_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     query_total = select(func.count(ShareLink.id)).where(ShareLink.user_id == current_user.id)
     query_items = select(ShareLink).where(ShareLink.user_id == current_user.id)
     
-    if filename:
-        decoded_filename = urllib.parse.unquote(filename)
-        filters = [ShareLink.original_filename == decoded_filename]
-        if fallback:
-            decoded_fallback = urllib.parse.unquote(fallback)
-            if decoded_fallback != decoded_filename:
-                filters.append(ShareLink.original_filename == decoded_fallback)
-        
-        query_total = query_total.where(or_(*filters))
-        query_items = query_items.where(or_(*filters))
+    if local_file_id:
+        query_total = query_total.where(ShareLink.local_file_id == local_file_id)
+        query_items = query_items.where(ShareLink.local_file_id == local_file_id)
         
     total = session.exec(query_total).one()
     links = session.exec(

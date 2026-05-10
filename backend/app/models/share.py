@@ -9,6 +9,7 @@ class ShareLink(SQLModel, table=True):
     user_id: int
     file_path: str
     original_filename: str
+    local_file_id: Optional[str] = Field(default=None, index=True)
     is_anonymous: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: Optional[datetime] = None
@@ -18,6 +19,7 @@ class ShareLinkRead(SQLModel):
     id: int
     token: str
     original_filename: str
+    local_file_id: Optional[str]
     is_anonymous: bool
     created_at: datetime
     expires_at: Optional[datetime]
