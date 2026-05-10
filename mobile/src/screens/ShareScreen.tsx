@@ -84,7 +84,11 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
 
     try {
       const currentSkip = loadMore ? skip + LIMIT : 0;
-      const response = await apiClient.get(`/api/share/me?skip=${currentSkip}&limit=${LIMIT}`);
+      let url = `/api/share/me?skip=${currentSkip}&limit=${LIMIT}`;
+      if (filename) {
+        url += `&filename=${encodeURIComponent(normalizeFilename(filename))}&fallback=${encodeURIComponent(filename)}`;
+      }
+      const response = await apiClient.get(url);
       
       if (loadMore) {
         setMyLinks(prev => {

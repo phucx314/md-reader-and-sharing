@@ -15,7 +15,7 @@ from fastapi import (
 )
 
 import urllib.parse
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, or_
 from app.database import get_session
 from app.models.user import User
 from app.models.share import ShareLink, ShareLinkRead, PaginatedShareLinks
@@ -121,17 +121,28 @@ def get_my_links(
     request: Request,
     skip: int = 0,
     limit: int = 10,
+    filename: Optional[str] = None,
+    fallback: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    total = session.exec(
-        select(func.count(ShareLink.id))
-        .where(ShareLink.user_id == current_user.id)
-    ).one()
-
+    query_total = select(func.count(ShareLink.id)).where(ShareLink.user_id == current_user.id)
+    query_items = select(ShareLink).where(ShareLink.user_id == current_user.id)
+    
+    if filename:
+        decoded_filename = urllib.parse.unquote(filename)
+        filters = [ShareLink.original_filename == decoded_filename]
+        if fallback:
+            decoded_fallback = urllib.parse.unquote(fallback)
+            if decoded_fallback != decoded_filename:
+                filters.append(ShareLink.original_filename == decoded_fallback)
+        
+        query_total = query_total.where(or_(*filters))
+        query_items = query_items.where(or_(*filters))
+        
+    total = session.exec(query_total).one()
     links = session.exec(
-        select(ShareLink)
-        .where(ShareLink.user_id == current_user.id)
+        query_items
         .order_by(ShareLink.created_at.desc())
         .offset(skip)
         .limit(limit)
