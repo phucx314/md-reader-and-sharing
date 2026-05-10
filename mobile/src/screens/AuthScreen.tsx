@@ -47,11 +47,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         await login(response.data.access_token);
-        Toast.show({ position: 'bottom', type: 'success', text1: '👋 Logged in!' });
+        Toast.show({ position: 'bottom', type: 'success', text1: 'Logged in!' });
         navigation.goBack();
       } else {
         await apiClient.post('/api/auth/register', { username, email, password });
-        Toast.show({ position: 'bottom', type: 'success', text1: '🎉 Account created! Please log in.' });
+        Toast.show({ position: 'bottom', type: 'success', text1: 'Account created! Please log in.' });
         setIsLogin(true);
       }
     } catch (error: any) {

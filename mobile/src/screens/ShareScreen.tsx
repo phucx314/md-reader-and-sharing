@@ -77,7 +77,7 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      Toast.show({ position: 'bottom', type: 'success', text1: '🔗 Link generated!' });
+      Toast.show({ position: 'bottom', type: 'success', text1: 'Link generated!' });
 
       await Share.share({
         message: `Check out my markdown: ${response.data.url}`,
@@ -110,7 +110,7 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
   const revokeLink = async (token: string) => {
     try {
       await apiClient.delete(`/api/share/${token}`);
-      Toast.show({ position: 'bottom', type: 'success', text1: '🗑️ Link revoked' });
+      Toast.show({ position: 'bottom', type: 'success', text1: 'Link revoked' });
       fetchMyLinks();
     } catch {
       Toast.show({ position: 'bottom', type: 'error', text1: 'Failed to revoke link' });
@@ -119,7 +119,7 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
 
   const copyLink = (url: string) => {
     Clipboard.setString(url);
-    Toast.show({ position: 'bottom', type: 'success', text1: '📋 Link copied!' });
+    Toast.show({ position: 'bottom', type: 'success', text1: 'Link copied!' });
   };
 
   const renderExpiryButton = (label: string, value: number | null) => (

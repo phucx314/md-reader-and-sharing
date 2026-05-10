@@ -63,7 +63,7 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
       }
       await FileSystem.writeAsStringAsync(targetUri, content);
       setUri(targetUri);
-      Toast.show({ position: 'bottom', type: 'success', text1: '💾 Saved!' });
+      Toast.show({ position: 'bottom', type: 'success', text1: 'Saved!' });
       return targetUri;
     } catch (e) {
       console.error('Failed to save file', e);
@@ -85,15 +85,18 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
 
   const markdownStyles = {
     body: { color: colors.text, fontFamily: 'SpaceGrotesk-Regular', fontSize: 16, lineHeight: 26, backgroundColor: isDark ? colors.background : '#FFFEF2' },
-    heading1: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 28, borderBottomWidth: 2, borderBottomColor: colors.border, paddingBottom: 8, marginBottom: 16 },
-    heading2: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 22 },
-    heading3: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 18 },
-    code_block: { backgroundColor: isDark ? '#2A2A2A' : '#E8F4F8', color: isDark ? '#E5E5E5' : '#111111', borderColor: colors.border, borderWidth: 2, borderRadius: 0, padding: 16, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
-    fence: { backgroundColor: isDark ? '#2A2A2A' : '#E8F4F8', color: isDark ? '#E5E5E5' : '#111111', borderColor: colors.border, borderWidth: 2, borderRadius: 0, padding: 16 },
-    blockquote: { borderLeftWidth: 4, borderLeftColor: colors.primary, paddingLeft: 16, backgroundColor: colors.primary + (isDark ? '22' : '33') },
+    heading1: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 28, borderBottomWidth: 2, borderBottomColor: colors.border, paddingBottom: 8, marginBottom: 16, marginTop: 24 },
+    heading2: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 22, marginTop: 20, marginBottom: 12 },
+    heading3: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 18, marginTop: 16, marginBottom: 10 },
+    paragraph: { marginTop: 8, marginBottom: 8 },
+    code_block: { backgroundColor: isDark ? '#2A2A2A' : '#E8F4F8', color: isDark ? '#E5E5E5' : '#111111', borderColor: colors.border, borderWidth: 2, borderRadius: 0, padding: 16, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', marginVertical: 12 },
+    fence: { backgroundColor: isDark ? '#2A2A2A' : '#E8F4F8', color: isDark ? '#E5E5E5' : '#111111', borderColor: colors.border, borderWidth: 2, borderRadius: 0, padding: 16, marginVertical: 12 },
+    blockquote: { borderLeftWidth: 4, borderLeftColor: colors.primary, paddingLeft: 16, backgroundColor: colors.primary + (isDark ? '22' : '33'), marginVertical: 16, paddingVertical: 8 },
     strong: { fontFamily: 'SpaceGrotesk-Bold' },
-    code_inline: { backgroundColor: isDark ? '#333' : '#FACC15', color: isDark ? '#FFF' : '#111', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
+    code_inline: { backgroundColor: isDark ? '#333' : '#FEF08A', color: isDark ? '#FFF' : '#111', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
     s: { textDecorationLine: 'line-through' },
+    table: { marginVertical: 16, borderColor: colors.border, borderWidth: 2 },
+    hr: { marginVertical: 24, backgroundColor: colors.border, height: 2 },
   };
 
   return (
