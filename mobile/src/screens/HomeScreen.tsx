@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   StyleSheet,
   View,
-  FlatList,
+  SectionList,
   TouchableOpacity,
   RefreshControl,
   Pressable,
@@ -21,11 +21,34 @@ import { useAuth } from '../context/AuthContext';
 
 const DIR_URI = `${(FileSystem as any).documentDirectory}markdown_files/`;
 
-type FileInfo = { name: string; uri: string; size: number };
+type FileInfo = { name: string; uri: string; size: number; mtime: number };
 type HomeScreenProps = { navigation: StackNavigationProp<any, any> };
+
+const formatTime = (ts: number) => {
+  const tsMs = ts > 20000000000 ? ts : ts * 1000;
+  const now = new Date();
+  const date = new Date(tsMs);
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  const diffInDays = Math.floor(diffInSeconds / 86400);
+
+  if (diffInDays > 3) {
+    return date.toLocaleDateString();
+  } else if (diffInDays > 0) {
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  } else if (diffInSeconds >= 3600) {
+    const hours = Math.floor(diffInSeconds / 3600);
+    return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  } else if (diffInSeconds >= 60) {
+    const minutes = Math.floor(diffInSeconds / 60);
+    return `${minutes} min${minutes > 1 ? 's' : ''} ago`;
+  } else {
+    return 'Just now';
+  }
+};
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [files, setFiles] = useState<FileInfo[]>([]);
+  const [sections, setSections] = useState<{ title: string; data: FileInfo[] }[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const { colors, isDark, toggleTheme } = useTheme();
   const { token, logout } = useAuth();
@@ -39,10 +62,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         contents.map(async (filename) => {
           const uri = `${DIR_URI}${filename}`;
           const info = await FileSystem.getInfoAsync(uri);
-          return { name: filename, uri, size: info.exists ? (info as any).size ?? 0 : 0 };
+          return { 
+            name: filename, 
+            uri, 
+            size: info.exists ? (info as any).size ?? 0 : 0,
+            mtime: info.exists ? (info as any).modificationTime ?? 0 : 0
+          };
         })
       );
-      setFiles(infos.filter((f) => f.name.endsWith('.md')));
+      
+      const validFiles = infos.filter((f) => f.name.endsWith('.md'));
+      
+      const today: FileInfo[] = [];
+      const thisWeek: FileInfo[] = [];
+      const thisMonth: FileInfo[] = [];
+      const older: FileInfo[] = [];
+
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const startOfWeek = startOfToday - now.getDay() * 86400000;
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+      validFiles.forEach(f => {
+        const mtimeMs = f.mtime > 20000000000 ? f.mtime : f.mtime * 1000;
+        if (mtimeMs >= startOfToday) today.push(f);
+        else if (mtimeMs >= startOfWeek) thisWeek.push(f);
+        else if (mtimeMs >= startOfMonth) thisMonth.push(f);
+        else older.push(f);
+      });
+
+      const newSections = [];
+      if (today.length) newSections.push({ title: 'Today', data: today.sort((a,b) => b.mtime - a.mtime) });
+      if (thisWeek.length) newSections.push({ title: 'This Week', data: thisWeek.sort((a,b) => b.mtime - a.mtime) });
+      if (thisMonth.length) newSections.push({ title: 'This Month', data: thisMonth.sort((a,b) => b.mtime - a.mtime) });
+      if (older.length) newSections.push({ title: 'Older', data: older.sort((a,b) => b.mtime - a.mtime) });
+
+      setFiles(validFiles);
+      setSections(newSections);
     } catch (e) {
       console.error(e);
     }
@@ -102,8 +158,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       </View>
 
       {/* ─── File list ────────────────────────────── */}
-      <FlatList
-        data={files}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.uri}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         contentContainerStyle={[styles.list, files.length === 0 && styles.listEmpty]}
@@ -114,6 +170,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <ThemedText muted style={{ textAlign: 'center' }}>
               Tap the + button to create{'\n'}or import a markdown file.
             </ThemedText>
+          </View>
+        )}
+        renderSectionHeader={({ section: { title } }) => (
+          <View style={styles.sectionHeader}>
+            <ThemedText type="label" style={{ fontFamily: 'SpaceGrotesk-Bold', color: colors.text }}>{title}</ThemedText>
           </View>
         )}
         renderItem={({ item }) => (
@@ -131,7 +192,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 <ThemedText type="label" numberOfLines={1}>
                   {item.name.replace('.md', '')}
                 </ThemedText>
-                <ThemedText type="caption" muted>{(item.size / 1024).toFixed(1)} KB · .md</ThemedText>
+                <ThemedText type="caption" muted>{(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}</ThemedText>
               </View>
 
               <View style={styles.fileActions}>
@@ -190,6 +251,12 @@ const styles = StyleSheet.create({
   iconButton: { marginLeft: 8, padding: 6 },
   list: { padding: 16, paddingBottom: 100 },
   listEmpty: { flex: 1 },
+  sectionHeader: {
+    paddingVertical: 10,
+    marginTop: 8,
+    marginBottom: 4,
+    backgroundColor: 'transparent',
+  },
   fileCard: {
     flexDirection: 'row',
     alignItems: 'center',

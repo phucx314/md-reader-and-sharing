@@ -27,12 +27,36 @@ type EditorScreenProps = {
 
 const DIR_URI = `${(FileSystem as any).documentDirectory}markdown_files/`;
 
+const formatTime = (ts: number) => {
+  if (!ts) return '';
+  const tsMs = ts > 20000000000 ? ts : ts * 1000;
+  const now = new Date();
+  const date = new Date(tsMs);
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  const diffInDays = Math.floor(diffInSeconds / 86400);
+
+  if (diffInDays > 3) {
+    return date.toLocaleDateString();
+  } else if (diffInDays > 0) {
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  } else if (diffInSeconds >= 3600) {
+    const hours = Math.floor(diffInSeconds / 3600);
+    return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  } else if (diffInSeconds >= 60) {
+    const minutes = Math.floor(diffInSeconds / 60);
+    return `${minutes} min${minutes > 1 ? 's' : ''} ago`;
+  } else {
+    return 'Just now';
+  }
+};
+
 export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route }) => {
   const { uri: initialUri, name: initialName, isNew } = route.params || {};
   const [content, setContent] = useState('');
   const [filename, setFilename] = useState(initialName ? initialName.replace('.md', '') : 'Untitled');
   const [uri, setUri] = useState<string | null>(initialUri || null);
   const [isPreview, setIsPreview] = useState(false);
+  const [lastModified, setLastModified] = useState<number>(0);
   const { colors, isDark } = useTheme();
   const { token } = useAuth();
 
@@ -43,6 +67,10 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
   const loadContent = async (fileUri: string) => {
     try {
       setContent(await FileSystem.readAsStringAsync(fileUri));
+      const info = await FileSystem.getInfoAsync(fileUri);
+      if (info.exists) {
+        setLastModified((info as any).modificationTime ?? 0);
+      }
     } catch (e) {
       console.error('Failed to read file', e);
       Toast.show({ position: 'bottom', type: 'error', text1: 'Failed to open file' });
@@ -63,6 +91,10 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
       }
       await FileSystem.writeAsStringAsync(targetUri, content);
       setUri(targetUri);
+      const info = await FileSystem.getInfoAsync(targetUri);
+      if (info.exists) {
+        setLastModified((info as any).modificationTime ?? 0);
+      }
       Toast.show({ position: 'bottom', type: 'success', text1: 'Saved!' });
       return targetUri;
     } catch (e) {
@@ -146,9 +178,16 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
           </TouchableOpacity>
         </View>
 
-        <ThemedText type="caption" muted style={styles.wordCount}>
-          {content.split(/\s+/).filter(Boolean).length} words
-        </ThemedText>
+        <View style={{ alignItems: 'flex-end' }}>
+          <ThemedText type="caption" muted style={styles.wordCount}>
+            {content.split(/\s+/).filter(Boolean).length} words
+          </ThemedText>
+          {lastModified > 0 && (
+            <ThemedText type="caption" muted style={{ fontSize: 11, marginTop: 2 }}>
+              Updated {formatTime(lastModified)}
+            </ThemedText>
+          )}
+        </View>
       </View>
 
       {/* ─── Editor / Preview ────────────────────── */}
