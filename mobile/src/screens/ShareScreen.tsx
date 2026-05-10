@@ -37,9 +37,16 @@ type GeneratedLink = {
   expires_at: string | null;
 };
 
+const parseDate = (dateString: string | null) => {
+  if (!dateString) return null;
+  const isNaive = !dateString.endsWith('Z') && !dateString.match(/[+-]\d{2}:\d{2}$/);
+  return new Date(isNaive ? `${dateString}Z` : dateString);
+};
+
 const isExpired = (expiresAt: string | null) => {
-  if (!expiresAt) return false;
-  return new Date(expiresAt) < new Date();
+  const date = parseDate(expiresAt);
+  if (!date) return false;
+  return date < new Date();
 };
 
 export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) => {
@@ -228,7 +235,7 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
 
               {item.expires_at && (
                 <ThemedText type="caption" style={{ color: expired ? colors.error : colors.textMuted, marginTop: 2 }}>
-                  {expired ? 'Expired' : 'Expires'}: {new Date(item.expires_at).toLocaleString()}
+                  {expired ? 'Expired' : 'Expires'}: {parseDate(item.expires_at)?.toLocaleString()}
                 </ThemedText>
               )}
 
