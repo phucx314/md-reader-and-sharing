@@ -77,7 +77,9 @@ def get_my_links(
     session: Session = Depends(get_session),
 ):
     links = session.exec(
-        select(ShareLink).where(ShareLink.user_id == current_user.id)
+        select(ShareLink)
+        .where(ShareLink.user_id == current_user.id)
+        .order_by(ShareLink.created_at.desc())
     ).all()
     base_url = str(request.base_url).rstrip("/")
     result = []

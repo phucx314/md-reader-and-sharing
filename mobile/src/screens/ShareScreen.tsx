@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Switch, Share, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Share,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Clipboard,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
@@ -10,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
 import { BrutalButton } from '../components/BrutalButton';
+import { BrutalSwitch } from '../components/BrutalSwitch';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 
@@ -24,7 +35,20 @@ type GeneratedLink = {
   url: string;
   original_filename: string;
   is_anonymous: boolean;
+  created_at: string;
   expires_at: string | null;
+};
+
+const parseDate = (dateString: string | null) => {
+  if (!dateString) return null;
+  const isNaive = !dateString.endsWith('Z') && !dateString.match(/[+-]\d{2}:\d{2}$/);
+  return new Date(isNaive ? `${dateString}Z` : dateString);
+};
+
+const isExpired = (expiresAt: string | null) => {
+  const date = parseDate(expiresAt);
+  if (!date) return false;
+  return date < new Date();
 };
 
 export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) => {
@@ -34,11 +58,11 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
   const [loading, setLoading] = useState(false);
   const [linksLoading, setLinksLoading] = useState(true);
   const [myLinks, setMyLinks] = useState<GeneratedLink[]>([]);
+  const [revokeModalVisible, setRevokeModalVisible] = useState(false);
+  const [linkToRevoke, setLinkToRevoke] = useState<string | null>(null);
   const { colors } = useTheme();
 
-  useEffect(() => {
-    fetchMyLinks();
-  }, []);
+  useEffect(() => { fetchMyLinks(); }, []);
 
   const fetchMyLinks = async () => {
     try {
@@ -54,70 +78,70 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
   const generateLink = async () => {
     if (!uri) return;
     setLoading(true);
-    
     try {
       const formData = new FormData();
-      
-      formData.append('file', {
-        uri: uri,
-        name: filename,
-        type: 'text/markdown',
-      } as any);
-      
+      formData.append('file', { uri, name: filename, type: 'text/markdown' } as any);
       if (expiryHours) formData.append('expires_in_hours', expiryHours.toString());
       formData.append('is_anonymous', isAnonymous.toString());
 
       const response = await apiClient.post('/api/share', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
-      Toast.show({ position: 'bottom', type: 'success', text1: 'Link generated successfully!' });
-      
-      // Native Share Sheet
-      await Share.share({
-        message: `Check out my markdown file: ${response.data.url}`,
-        url: response.data.url, // iOS specific
-      });
-      
-      fetchMyLinks();
-      
-    } catch (error: any) {
-      console.error(error);
-      const detail = error.response?.data?.detail;
-      const errorMessage = Array.isArray(detail) 
-        ? detail.map((d: any) => d.msg).join(', ') 
-        : (detail || 'Please check your connection');
 
-      Toast.show({ position: 'bottom', 
-        type: 'error', 
-        text1: 'Sharing failed', 
-        text2: errorMessage
+      Toast.show({ position: 'bottom', type: 'success', text1: 'Link generated!' });
+
+      await Share.share({
+        message: `Check out my markdown: ${response.data.url}`,
+        url: response.data.url,
       });
+
+      fetchMyLinks();
+    } catch (error: any) {
+      const detail = error.response?.data?.detail;
+      const errorMessage = Array.isArray(detail)
+        ? detail.map((d: any) => d.msg).join(', ')
+        : detail || 'Please check your connection';
+      Toast.show({ position: 'bottom', type: 'error', text1: 'Sharing failed', text2: errorMessage });
     } finally {
       setLoading(false);
     }
   };
 
-  const revokeLink = async (token: string) => {
+  const confirmRevoke = (token: string) => {
+    setLinkToRevoke(token);
+    setRevokeModalVisible(true);
+  };
+
+  const executeRevoke = async () => {
+    if (!linkToRevoke) return;
     try {
-      await apiClient.delete(`/api/share/${token}`);
+      await apiClient.delete(`/api/share/${linkToRevoke}`);
       Toast.show({ position: 'bottom', type: 'success', text1: 'Link revoked' });
       fetchMyLinks();
-    } catch (error) {
+    } catch {
       Toast.show({ position: 'bottom', type: 'error', text1: 'Failed to revoke link' });
+    } finally {
+      setRevokeModalVisible(false);
+      setLinkToRevoke(null);
     }
   };
 
+  const copyLink = (url: string) => {
+    Clipboard.setString(url);
+    Toast.show({ position: 'bottom', type: 'success', text1: 'Link copied!' });
+  };
+
   const renderExpiryButton = (label: string, value: number | null) => (
-    <TouchableOpacity 
+    <TouchableOpacity
+      key={label}
       style={[
-        styles.expiryBtn, 
-        { borderColor: colors.border },
-        expiryHours === value && { backgroundColor: colors.primary }
+        styles.expiryBtn,
+        { borderColor: colors.border, backgroundColor: colors.card },
+        expiryHours === value && { backgroundColor: colors.primary },
       ]}
       onPress={() => setExpiryHours(value)}
     >
-      <ThemedText style={{ color: '#111', fontWeight: expiryHours === value ? 'bold' : 'normal' }}>
+      <ThemedText type="label" style={{ color: expiryHours === value ? '#111' : colors.text, fontWeight: expiryHours === value ? '700' : '400' }}>
         {label}
       </ThemedText>
     </TouchableOpacity>
@@ -125,6 +149,7 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* ─── Header ─────────────────────────────────── */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -136,68 +161,111 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
       <FlatList
         ListHeaderComponent={
           <View style={styles.content}>
+            {/* ─── Config card ─────────────────── */}
             {uri && (
               <ThemedView card style={styles.configCard}>
-                <ThemedText type="subtitle" style={styles.sectionTitle}>Share Configuration</ThemedText>
-                
+                <ThemedText type="subtitle" style={styles.sectionLabel}>Share Settings</ThemedText>
+
                 <View style={styles.row}>
-                  <ThemedText>Share Anonymously</ThemedText>
-                  <Switch 
-                    value={isAnonymous} 
-                    onValueChange={setIsAnonymous} 
-                    trackColor={{ false: '#767577', true: colors.primary }}
-                    thumbColor={isAnonymous ? '#111' : '#f4f3f4'}
+                  <View>
+                    <ThemedText type="label">Share Anonymously</ThemedText>
+                    <ThemedText type="caption" muted>Hide your username from viewers</ThemedText>
+                  </View>
+                  <BrutalSwitch
+                    value={isAnonymous}
+                    onValueChange={setIsAnonymous}
                   />
                 </View>
-                
-                <ThemedText style={styles.label}>Link Expiry</ThemedText>
+
+                <ThemedText type="label" style={styles.sectionLabel}>Link Expiry</ThemedText>
                 <View style={styles.expiryRow}>
                   {renderExpiryButton('1h', 1)}
                   {renderExpiryButton('24h', 24)}
                   {renderExpiryButton('7d', 168)}
-                  {renderExpiryButton('Never', null)}
+                  {renderExpiryButton('∞', null)}
                 </View>
 
-                <BrutalButton 
-                  title="Generate & Share Link" 
-                  onPress={generateLink} 
+                <BrutalButton
+                  title="Generate & Share Link"
+                  onPress={generateLink}
                   loading={loading}
-                  style={styles.generateBtn}
+                  fullWidth
                 />
               </ThemedView>
             )}
 
-            <ThemedText type="subtitle" style={styles.sectionTitle}>My Active Links</ThemedText>
+            <ThemedText type="subtitle" style={styles.sectionLabel}>My Links</ThemedText>
           </View>
         }
-        data={myLinks}
-        keyExtractor={item => item.token}
+        data={[...myLinks].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())}
+        keyExtractor={(item) => item.token}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
-          linksLoading ? <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} /> :
-          <ThemedText style={styles.emptyText}>No active share links found.</ThemedText>
+          linksLoading ? (
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <ThemedText muted style={styles.emptyText}>No active share links.</ThemedText>
+          )
         }
-        renderItem={({ item }) => (
-          <ThemedView card style={styles.linkItem}>
-            <View style={styles.linkInfo}>
-              <ThemedText type="label" numberOfLines={1}>{item.original_filename}</ThemedText>
-              <ThemedText style={{ fontSize: 12, opacity: 0.7 }} numberOfLines={1}>{item.url}</ThemedText>
+        renderItem={({ item }) => {
+          const expired = isExpired(item.expires_at);
+          return (
+            <ThemedView card style={styles.linkCard}>
+              <View style={styles.linkTopRow}>
+                <ThemedText type="label" numberOfLines={1} style={{ flex: 1 }}>
+                  {item.original_filename}
+                </ThemedText>
+                {/* Status badge */}
+                <View style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor: expired ? colors.error : colors.success,
+                    borderColor: colors.border,
+                  },
+                ]}>
+                  <ThemedText type="caption" style={{ color: '#fff', fontFamily: 'SpaceGrotesk-Bold' }}>
+                    {expired ? 'EXPIRED' : 'ACTIVE'}
+                  </ThemedText>
+                </View>
+              </View>
+
+              <ThemedText type="caption" muted numberOfLines={1} style={{ marginTop: 4 }}>
+                {item.url}
+              </ThemedText>
+
               {item.expires_at && (
-                <ThemedText style={{ fontSize: 12, color: colors.error }}>
-                  Expires: {new Date(item.expires_at).toLocaleString()}
+                <ThemedText type="caption" style={{ color: expired ? colors.error : colors.textMuted, marginTop: 2 }}>
+                  {expired ? 'Expired' : 'Expires'}: {parseDate(item.expires_at)?.toLocaleString()}
                 </ThemedText>
               )}
-            </View>
-            <View style={styles.linkActions}>
-              <TouchableOpacity onPress={() => Share.share({ url: item.url, message: item.url })} style={styles.actionBtn}>
-                <Ionicons name="share-social-outline" size={20} color={colors.text} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => revokeLink(item.token)} style={styles.actionBtn}>
-                <Ionicons name="trash-outline" size={20} color={colors.error} />
-              </TouchableOpacity>
-            </View>
-          </ThemedView>
-        )}
+
+              {/* Actions */}
+              <View style={styles.linkActions}>
+                <TouchableOpacity style={[styles.actionChip, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => copyLink(item.url)}>
+                  <Ionicons name="copy-outline" size={14} color={colors.text} />
+                  <ThemedText type="caption" style={{ marginLeft: 4 }}>Copy</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionChip, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => Share.share({ url: item.url, message: item.url })}>
+                  <Ionicons name="share-social-outline" size={14} color={colors.text} />
+                  <ThemedText type="caption" style={{ marginLeft: 4 }}>Share</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionChip, { borderColor: colors.error, backgroundColor: colors.error + '22' }]} onPress={() => confirmRevoke(item.token)}>
+                  <Ionicons name="trash-outline" size={14} color={colors.error} />
+                  <ThemedText type="caption" style={{ marginLeft: 4, color: colors.error }}>Revoke</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </ThemedView>
+          );
+        }}
+      />
+
+      <ConfirmModal
+        visible={revokeModalVisible}
+        title="Revoke Link"
+        message="This will permanently delete the share link. Anyone with the link will lose access."
+        onCancel={() => { setRevokeModalVisible(false); setLinkToRevoke(null); }}
+        onConfirm={executeRevoke}
+        confirmText="Revoke"
       />
     </SafeAreaView>
   );
@@ -209,44 +277,51 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    borderBottomWidth: 3,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 2,
   },
   iconButton: { padding: 8 },
-  content: { padding: 16 },
+  content: { paddingTop: 16, paddingBottom: 8 },
   configCard: { marginBottom: 24 },
-  sectionTitle: { marginBottom: 16 },
+  sectionLabel: { marginBottom: 14 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  label: { marginBottom: 8, fontWeight: 'bold' },
   expiryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
+    gap: 8,
+    marginBottom: 20,
   },
   expiryBtn: {
     flex: 1,
-    marginHorizontal: 4,
-    paddingVertical: 8,
+    paddingVertical: 10,
     alignItems: 'center',
     borderWidth: 2,
-    backgroundColor: '#F5F5F5',
   },
-  generateBtn: { marginTop: 8 },
-  listContainer: { paddingHorizontal: 16, paddingBottom: 32 },
-  linkItem: {
+  listContainer: { paddingHorizontal: 16, paddingBottom: 40 },
+  emptyText: { textAlign: 'center', marginTop: 20 },
+  linkCard: { marginBottom: 14, padding: 14 },
+  linkTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 2,
+    borderRadius: 4,
+  },
+  linkActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    padding: 12,
+    marginTop: 12,
+    gap: 8,
   },
-  linkInfo: { flex: 1, marginRight: 12 },
-  linkActions: { flexDirection: 'row' },
-  actionBtn: { padding: 8, marginLeft: 8 },
-  emptyText: { textAlign: 'center', opacity: 0.6, marginTop: 20 },
+  actionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 2,
+  },
 });
