@@ -48,12 +48,12 @@ export const ThemedView: React.FC<ThemedViewProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: 3,
+    borderWidth: 2,
     padding: 16,
     // Hard offset shadow — zero blur is the neo-brutalism signature
-    shadowOffset: { width: 6, height: 6 },
+    shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
     shadowRadius: 0,
-    elevation: 10,
+    elevation: 0,
   },
 });

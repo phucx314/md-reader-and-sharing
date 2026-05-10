@@ -152,11 +152,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       {/* ─── FAB ──────────────────────────────────── */}
       <TouchableOpacity
-        style={[styles.fabShadow, { backgroundColor: colors.shadow }]}
+        style={styles.fabContainer}
         onPress={() => navigation.navigate('Editor', { isNew: true })}
         activeOpacity={0.85}
         accessibilityLabel="Create new file"
       >
+        <View style={[styles.fabShadow, { backgroundColor: colors.shadow }]} />
         <View style={[styles.fab, { backgroundColor: colors.primary, borderColor: colors.border }]}>
           <Ionicons name="add" size={30} color="#111" />
         </View>
@@ -173,7 +174,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderBottomWidth: 3,
+    borderBottomWidth: 2,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   badge: {
@@ -214,26 +215,30 @@ const styles = StyleSheet.create({
     paddingTop: 80,
   },
   emptyEmoji: { fontSize: 64, marginBottom: 20 },
-  // FAB: shadow layer underneath, button on top
-  fabShadow: {
+  // FAB container holds both shadow and button
+  fabContainer: {
     position: 'absolute',
     bottom: 28,
-    right: 24,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    top: undefined,
-    // Shadow sits 4px offset
-    transform: [{ translateX: 4 }, { translateY: 4 }],
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 32,
     right: 28,
     width: 60,
     height: 60,
+  },
+  fabShadow: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    right: -4,
+    bottom: -4,
     borderRadius: 30,
-    borderWidth: 3,
+  },
+  fab: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 30,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 0,

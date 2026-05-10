@@ -85,12 +85,12 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
 
   const markdownStyles = {
     body: { color: colors.text, fontFamily: 'SpaceGrotesk-Regular', fontSize: 16, lineHeight: 26, backgroundColor: isDark ? colors.background : '#FFFEF2' },
-    heading1: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 28, borderBottomWidth: 3, borderBottomColor: colors.border, paddingBottom: 8, marginBottom: 16 },
+    heading1: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 28, borderBottomWidth: 2, borderBottomColor: colors.border, paddingBottom: 8, marginBottom: 16 },
     heading2: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 22 },
     heading3: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 18 },
-    code_block: { backgroundColor: isDark ? '#1a1a1a' : '#111', color: '#FFE500', borderColor: colors.border, borderWidth: 3, borderRadius: 0, padding: 16, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
-    fence: { backgroundColor: isDark ? '#1a1a1a' : '#111', color: '#FFE500', borderColor: colors.border, borderWidth: 3, borderRadius: 0, padding: 16 },
-    blockquote: { borderLeftWidth: 4, borderLeftColor: colors.primary, paddingLeft: 16, backgroundColor: colors.primary + '22' },
+    code_block: { backgroundColor: isDark ? '#2A2A2A' : '#E8F4F8', color: isDark ? '#E5E5E5' : '#111111', borderColor: colors.border, borderWidth: 2, borderRadius: 0, padding: 16, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+    fence: { backgroundColor: isDark ? '#2A2A2A' : '#E8F4F8', color: isDark ? '#E5E5E5' : '#111111', borderColor: colors.border, borderWidth: 2, borderRadius: 0, padding: 16 },
+    blockquote: { borderLeftWidth: 4, borderLeftColor: colors.primary, paddingLeft: 16, backgroundColor: colors.primary + (isDark ? '22' : '33') },
     strong: { fontFamily: 'SpaceGrotesk-Bold' },
   };
 
@@ -155,16 +155,18 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
             </Markdown>
           </ScrollView>
         ) : (
-          <TextInput
-            style={[styles.editor, { color: colors.text, backgroundColor: colors.background }]}
-            value={content}
-            onChangeText={setContent}
-            multiline
-            textAlignVertical="top"
-            placeholder={"# Start writing…\n\nMarkdown is supported."}
-            placeholderTextColor={isDark ? '#555' : '#aaa'}
-            scrollEnabled
-          />
+          <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ flexGrow: 1 }}>
+            <TextInput
+              style={[styles.editor, { color: colors.text }]}
+              value={content}
+              onChangeText={setContent}
+              multiline
+              textAlignVertical="top"
+              placeholder={"# Start writing…\n\nMarkdown is supported."}
+              placeholderTextColor={isDark ? '#555' : '#aaa'}
+              scrollEnabled={false} // Disable inner scroll so the outer ScrollView handles it
+            />
+          </ScrollView>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -178,7 +180,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 10,
-    borderBottomWidth: 3,
+    borderBottomWidth: 2,
     gap: 4,
   },
   headerBtn: { padding: 8 },
@@ -196,11 +198,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderBottomWidth: 3,
+    borderBottomWidth: 2,
   },
   togglePill: {
     flexDirection: 'row',
-    borderWidth: 3,
+    borderWidth: 2,
     overflow: 'hidden',
   },
   toggleOption: {

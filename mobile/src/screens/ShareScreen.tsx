@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 14,
-    borderBottomWidth: 3,
+    borderBottomWidth: 2,
   },
   iconButton: { padding: 8 },
   content: { padding: 16 },

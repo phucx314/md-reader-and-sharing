@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 16,
-    borderWidth: 3,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    borderWidth: 3,
+    borderWidth: 2,
     marginBottom: 24,
     overflow: 'hidden',
   },

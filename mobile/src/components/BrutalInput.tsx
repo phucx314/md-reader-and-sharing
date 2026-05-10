@@ -74,12 +74,12 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 3,
+    borderWidth: 2,
     paddingHorizontal: 14,
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
     shadowRadius: 0,
-    elevation: 8,
+    elevation: 0,
   },
   icon: {
     marginRight: 10,

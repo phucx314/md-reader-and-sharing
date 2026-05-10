@@ -101,7 +101,7 @@ describe('ThemedView', () => {
     const view = UNSAFE_getByType(View);
     // Card should have borderWidth
     const flatStyle = [].concat(...(view.props.style || []));
-    const hasBorder = flatStyle.some((s: any) => s?.borderWidth === 3);
+    const hasBorder = flatStyle.some((s: any) => s?.borderWidth === 2);
     expect(hasBorder).toBe(true);
   });
 

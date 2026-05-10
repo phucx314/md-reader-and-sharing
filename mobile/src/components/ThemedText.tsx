@@ -44,7 +44,9 @@ export const ThemedText: React.FC<ThemedTextProps> = ({
           { backgroundColor: colors.primary, borderColor: colors.border },
         ]}
       >
-        {textEl}
+        <Text style={[{ color: '#111111' }, styles[type], style]} {...props}>
+          {children}
+        </Text>
       </View>
     );
   }

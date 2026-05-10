@@ -54,7 +54,7 @@ export const BrutalButton: React.FC<BrutalButtonProps> = ({
   };
 
   // Simulate pressing down: translate + shrink shadow
-  const translateXY = pressed.interpolate({ inputRange: [0, 1], outputRange: [0, 3] });
+  const translateXY = pressed.interpolate({ inputRange: [0, 1], outputRange: [0, 2] });
   const shadowOpacity = pressed.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
 
   const sizePad = { sm: { paddingVertical: 8, paddingHorizontal: 16 }, md: { paddingVertical: 14, paddingHorizontal: 24 }, lg: { paddingVertical: 18, paddingHorizontal: 32 } }[size];
@@ -105,17 +105,17 @@ export const BrutalButton: React.FC<BrutalButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    borderWidth: 3,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
   },
   shadow: {
     position: 'absolute',
-    top: 6,
-    left: 6,
-    right: -6,
-    bottom: -6,
+    top: 4,
+    left: 4,
+    right: -4,
+    bottom: -4,
     zIndex: 0,
   },
   text: {
