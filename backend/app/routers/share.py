@@ -3,6 +3,7 @@ import uuid
 import aiofiles
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import (
     APIRouter,
     Depends,
@@ -167,6 +168,53 @@ def get_my_links(
         
     return PaginatedShareLinks(total=total, items=items)
 
+
+class TokenList(BaseModel):
+    tokens: List[str]
+
+@router.post("/batch-revoke", status_code=status.HTTP_204_NO_CONTENT)
+def batch_revoke_links(
+    body: TokenList,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    links = session.exec(
+        select(ShareLink).where(
+            ShareLink.token.in_(body.tokens),
+            ShareLink.user_id == current_user.id
+        )
+    ).all()
+
+    for link in links:
+        if os.path.exists(link.file_path):
+            try:
+                os.remove(link.file_path)
+            except Exception:
+                pass
+        session.delete(link)
+
+    session.commit()
+    return None
+
+@router.delete("/all", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_all_links(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    links = session.exec(
+        select(ShareLink).where(ShareLink.user_id == current_user.id)
+    ).all()
+
+    for link in links:
+        if os.path.exists(link.file_path):
+            try:
+                os.remove(link.file_path)
+            except Exception:
+                pass
+        session.delete(link)
+
+    session.commit()
+    return None
 
 @router.delete("/{token}", status_code=status.HTTP_204_NO_CONTENT)
 def revoke_link(
