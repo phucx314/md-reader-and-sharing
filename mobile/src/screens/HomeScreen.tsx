@@ -265,7 +265,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       {/* ─── File list ────────────────────────────── */}
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.uri}
+        keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
