@@ -9,11 +9,8 @@ interface ConfirmModalProps {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
-  onNeutral?: () => void;
-  onDismiss?: () => void;
   confirmText?: string;
   cancelText?: string;
-  neutralText?: string;
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -22,17 +19,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   message,
   onConfirm,
   onCancel,
-  onNeutral,
-  onDismiss,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  neutralText,
 }) => {
   const { colors, isDark } = useTheme();
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss || onCancel}>
-      <View style={styles.overlay}>
+    <Modal visible={visible} transparent animationType="fade">
+      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onCancel}>
         <TouchableWithoutFeedback>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, shadowColor: isDark ? 'transparent' : colors.shadow }]}>
             <ThemedText type="subtitle" style={styles.title}>{title}</ThemedText>
@@ -46,15 +40,6 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 <ThemedText style={styles.buttonText}>{cancelText}</ThemedText>
               </TouchableOpacity>
               
-              {onNeutral && (
-                <TouchableOpacity
-                  style={[styles.button, { backgroundColor: colors.background, borderColor: colors.primary }]}
-                  onPress={onNeutral}
-                >
-                  <ThemedText style={[styles.buttonText, { color: colors.primary }]}>{neutralText}</ThemedText>
-                </TouchableOpacity>
-              )}
-              
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: colors.error, borderColor: colors.border }]}
                 onPress={onConfirm}
@@ -64,7 +49,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             </View>
           </View>
         </TouchableWithoutFeedback>
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 };
@@ -95,14 +80,15 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   actions: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     gap: 12,
   },
   button: {
     borderWidth: 2,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    width: '100%',
+    minWidth: 90,
     alignItems: 'center',
   },
   buttonText: {

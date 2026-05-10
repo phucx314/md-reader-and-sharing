@@ -377,12 +377,9 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
         visible={duplicateModalVisible}
         title="Link Already Exists"
         message="One or more identical active share links for this file already exist. What would you like to do?"
-        cancelText="Cancel"
-        neutralText="New Link"
+        cancelText="New Link"
         confirmText="Overwrite All"
-        onCancel={() => setDuplicateModalVisible(false)}
-        onDismiss={() => setDuplicateModalVisible(false)}
-        onNeutral={() => {
+        onCancel={() => {
           setDuplicateModalVisible(false);
           generateLink(false, true);
         }}
