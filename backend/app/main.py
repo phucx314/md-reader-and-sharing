@@ -9,14 +9,49 @@ from sqlmodel import SQLModel
 # Import models so they are registered with SQLModel metadata before creating tables
 
 from app.routers import auth, share, view
+import asyncio
+import os
+from datetime import datetime, timezone, timedelta
+from sqlmodel import Session, select
+from app.models.share import ShareLink
+
+async def cleanup_expired_links():
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            cutoff = now - timedelta(days=7)
+            
+            with Session(engine) as session:
+                expired_links = session.exec(
+                    select(ShareLink).where(ShareLink.expires_at < cutoff)
+                ).all()
+                
+                for link in expired_links:
+                    if os.path.exists(link.file_path):
+                        try:
+                            os.remove(link.file_path)
+                        except Exception:
+                            pass
+                    session.delete(link)
+                session.commit()
+        except Exception as e:
+            print(f"Cleanup task error: {e}")
+            
+        # Sleep for 1 hour
+        await asyncio.sleep(3600)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: create db tables
     SQLModel.metadata.create_all(engine)
+    
+    # Start cleanup task
+    task = asyncio.create_task(cleanup_expired_links())
+    
     yield
     # Shutdown logic if any
+    task.cancel()
 
 
 app = FastAPI(title="MD Reader & Sharing API", lifespan=lifespan)

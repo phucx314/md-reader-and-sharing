@@ -7,17 +7,18 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    status,
     UploadFile,
     File,
     Form,
+    status,
     Request,
 )
 
-from sqlmodel import Session, select
+import urllib.parse
+from sqlmodel import Session, select, func
 from app.database import get_session
 from app.models.user import User
-from app.models.share import ShareLink, ShareLinkRead
+from app.models.share import ShareLink, ShareLinkRead, PaginatedShareLinks
 from app.routers.auth import get_current_user
 from app.config import UPLOAD_DIR
 
@@ -30,10 +31,11 @@ async def create_share_link(
     file: UploadFile = File(...),
     expires_in_hours: Optional[int] = Form(None),
     is_anonymous: bool = Form(False),
+    overwrite: bool = Form(False),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    filename = file.filename
+    filename = urllib.parse.unquote(file.filename) if file.filename else ""
     if not filename or not filename.endswith(".md"):
         raise HTTPException(status_code=400, detail="Only .md files are allowed")
 
@@ -53,6 +55,50 @@ async def create_share_link(
     if expires_in_hours:
         expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)
 
+    now = datetime.now(timezone.utc)
+    
+    if not overwrite:
+        existing_link = session.exec(
+            select(ShareLink)
+            .where(
+                ShareLink.user_id == current_user.id,
+                ShareLink.original_filename == filename,
+                ShareLink.is_anonymous == is_anonymous
+            )
+            .order_by(ShareLink.created_at.desc())
+        ).first()
+
+        if existing_link:
+            is_expired = False
+            if existing_link.expires_at:
+                exp = existing_link.expires_at.replace(tzinfo=timezone.utc) if existing_link.expires_at.tzinfo is None else existing_link.expires_at
+                if exp < now:
+                    is_expired = True
+            
+            if not is_expired:
+                base_url = str(request.base_url).rstrip("/")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ShareLinkRead(**existing_link.dict(), url=f"{base_url}/view/{existing_link.token}").dict()
+                )
+    else:
+        existing_links = session.exec(
+            select(ShareLink)
+            .where(
+                ShareLink.user_id == current_user.id,
+                ShareLink.original_filename == filename,
+                ShareLink.is_anonymous == is_anonymous
+            )
+        ).all()
+        for el in existing_links:
+            if os.path.exists(el.file_path):
+                try:
+                    os.remove(el.file_path)
+                except Exception:
+                    pass
+            session.delete(el)
+        session.commit()
+
     share_link = ShareLink(
         token=token,
         user_id=current_user.id,
@@ -70,22 +116,33 @@ async def create_share_link(
     return ShareLinkRead(**share_link.dict(), url=f"{base_url}/view/{token}")
 
 
-@router.get("/me", response_model=List[ShareLinkRead])
+@router.get("/me", response_model=PaginatedShareLinks)
 def get_my_links(
     request: Request,
+    skip: int = 0,
+    limit: int = 10,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
+    total = session.exec(
+        select(func.count(ShareLink.id))
+        .where(ShareLink.user_id == current_user.id)
+    ).one()
+
     links = session.exec(
         select(ShareLink)
         .where(ShareLink.user_id == current_user.id)
         .order_by(ShareLink.created_at.desc())
+        .offset(skip)
+        .limit(limit)
     ).all()
+    
     base_url = str(request.base_url).rstrip("/")
-    result = []
+    items = []
     for link in links:
-        result.append(ShareLinkRead(**link.dict(), url=f"{base_url}/view/{link.token}"))
-    return result
+        items.append(ShareLinkRead(**link.dict(), url=f"{base_url}/view/{link.token}"))
+        
+    return PaginatedShareLinks(total=total, items=items)
 
 
 @router.delete("/{token}", status_code=status.HTTP_204_NO_CONTENT)

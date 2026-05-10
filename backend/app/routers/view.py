@@ -46,123 +46,170 @@ async def view_markdown_html(token: str, session: Session = Depends(get_session)
             f"<p class='author'>Shared by: <strong>{user.username}</strong></p>"
         )
 
-    # Neo-Brutalism styling for the web view
-    html = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{link.original_filename} - MD Reader</title>
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap');
-            
-            :root {{
-                --bg: #FFFFFF;
-                --text: #111111;
-                --primary: #FFE500;
-                --border: #111111;
-            }}
-            
-            body {{
-                font-family: 'Space Grotesk', sans-serif;
-                background-color: var(--bg);
-                color: var(--text);
-                line-height: 1.6;
-                padding: 2rem;
-                max-width: 800px;
-                margin: 0 auto;
-            }}
-            
+    html = generate_html_page(link, html_content, author_info, token)
+    return HTMLResponse(content=html)
+def generate_html_page(link, html_content, author_info="", token=None):
+    actions_html = ""
+    if token:
+        actions_html = f"""
+            <div class="actions">
+                <a href="/view/{token}/download?format=md" class="download-btn">Download .md</a>
+                <a href="/view/{token}/download?format=html" class="download-btn">Download .html</a>
+            </div>
+        """
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{link.original_filename} - MD Reader</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap');
+        
+        :root {{
+            --bg: #FFFFFF;
+            --text: #111111;
+            --primary: #FFE500;
+            --border: #111111;
+        }}
+        
+        body {{
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }}
+        
+        .header {{
+            border-bottom: 3px solid var(--border);
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }}
+
+        @media (min-width: 600px) {{
             .header {{
-                border-bottom: 3px solid var(--border);
-                margin-bottom: 2rem;
-                padding-bottom: 1rem;
-                display: flex;
+                flex-direction: row;
                 justify-content: space-between;
                 align-items: center;
             }}
-            
-            .author {{
-                font-size: 0.9rem;
-                background-color: var(--primary);
-                padding: 0.5rem 1rem;
-                border: 2px solid var(--border);
-                box-shadow: 4px 4px 0 var(--border);
-                display: inline-block;
-            }}
-            
-            .content {{
-                background-color: #F5F5F5;
-                padding: 2rem;
-                border: 3px solid var(--border);
-                box-shadow: 6px 6px 0 var(--border);
-            }}
-            
-            .download-btn {{
-                background-color: var(--primary);
-                color: var(--text);
-                text-decoration: none;
-                padding: 0.5rem 1rem;
-                border: 2px solid var(--border);
-                box-shadow: 4px 4px 0 var(--border);
-                font-weight: bold;
-                transition: transform 0.1s;
-            }}
-            
-            .download-btn:active {{
-                transform: translate(2px, 2px);
-                box-shadow: 2px 2px 0 var(--border);
-            }}
-            
-            pre {{
-                background-color: #111;
-                color: #fff;
-                padding: 1rem;
-                border-radius: 4px;
-                overflow-x: auto;
-            }}
-            
-            code {{
-                font-family: monospace;
-            }}
-            
-            img {{
-                max-width: 100%;
-                border: 2px solid var(--border);
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <div>
-                <h1>{link.original_filename}</h1>
-                {author_info}
-            </div>
-            <a href="/view/{token}/raw" class="download-btn">Download .md</a>
+        }}
+
+        h1 {{
+            margin: 0 0 0.5rem 0;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }}
+        
+        .author {{
+            font-size: 0.9rem;
+            background-color: var(--primary);
+            padding: 0.5rem 1rem;
+            border: 2px solid var(--border);
+            box-shadow: 4px 4px 0 var(--border);
+            display: inline-block;
+            margin: 0;
+        }}
+        
+        .content {{
+            background-color: #F5F5F5;
+            padding: 1.5rem;
+            border: 3px solid var(--border);
+            box-shadow: 6px 6px 0 var(--border);
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }}
+        
+        .actions {{
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }}
+
+        .download-btn {{
+            background-color: var(--primary);
+            color: var(--text);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 2px solid var(--border);
+            box-shadow: 4px 4px 0 var(--border);
+            font-weight: bold;
+            transition: transform 0.1s;
+            white-space: nowrap;
+        }}
+        
+        .download-btn:active {{
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 var(--border);
+        }}
+        
+        pre {{
+            background-color: #111;
+            color: #fff;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }}
+        
+        code {{
+            font-family: monospace;
+        }}
+        
+        img {{
+            max-width: 100%;
+            border: 2px solid var(--border);
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>{link.original_filename}</h1>
+            {author_info}
         </div>
-        <div class="content">
-            {html_content}
-        </div>
-    </body>
-    </html>
-    """
+        {actions_html}
+    </div>
+    <div class="content">
+        {html_content}
+    </div>
+</body>
+</html>
+"""
     return HTMLResponse(content=html)
 
 
-@router.get("/{token}/raw")
-async def download_markdown_raw(token: str, session: Session = Depends(get_session)):
+@router.get("/{token}/download")
+async def download_file(token: str, format: str = "md", session: Session = Depends(get_session)):
     link, _ = get_valid_link(token, session)
     
     with open(link.file_path, "rb") as f:
         content = f.read()
         
-    # Prepend UTF-8 BOM for Windows compatibility
-    if not content.startswith(b'\xef\xbb\xbf'):
-        content = b'\xef\xbb\xbf' + content
+    if format == "html":
+        md_content = content.decode("utf-8")
+        html_content = markdown.markdown(
+            md_content, extensions=["fenced_code", "tables", "nl2br"]
+        )
+        html_page = generate_html_page(link, html_content)
         
-    return Response(
-        content=content,
-        media_type="text/markdown; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{link.original_filename}"'}
-    )
+        return Response(
+            content=html_page.encode("utf-8"),
+            media_type="text/html; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{link.original_filename.replace(".md", ".html")}"'}
+        )
+    else:
+        # Prepend UTF-8 BOM for Windows compatibility
+        if not content.startswith(b'\xef\xbb\xbf'):
+            content = b'\xef\xbb\xbf' + content
+            
+        return Response(
+            content=content,
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{link.original_filename}"'}
+        )

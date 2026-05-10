@@ -22,3 +22,9 @@ class ShareLinkRead(SQLModel):
     created_at: datetime
     expires_at: Optional[datetime]
     url: str  # To be populated by the response
+
+from typing import List
+
+class PaginatedShareLinks(SQLModel):
+    items: List[ShareLinkRead]
+    total: int

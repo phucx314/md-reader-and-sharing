@@ -51,6 +51,11 @@ const isExpired = (expiresAt: string | null) => {
   return date < new Date();
 };
 
+const normalizeFilename = (str: string) => {
+  if (!str) return str;
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
+};
+
 export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) => {
   const { uri, filename } = route.params || {};
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -58,31 +63,63 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
   const [loading, setLoading] = useState(false);
   const [linksLoading, setLinksLoading] = useState(true);
   const [myLinks, setMyLinks] = useState<GeneratedLink[]>([]);
+  const [skip, setSkip] = useState(0);
+  const [totalLinks, setTotalLinks] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const LIMIT = 10;
   const [revokeModalVisible, setRevokeModalVisible] = useState(false);
   const [linkToRevoke, setLinkToRevoke] = useState<string | null>(null);
+  const [duplicateModalVisible, setDuplicateModalVisible] = useState(false);
   const { colors } = useTheme();
 
   useEffect(() => { fetchMyLinks(); }, []);
 
-  const fetchMyLinks = async () => {
+  const fetchMyLinks = async (loadMore = false) => {
+    if (loadMore) {
+      if (myLinks.length >= totalLinks || loadingMore) return;
+      setLoadingMore(true);
+    } else {
+      setLinksLoading(true);
+    }
+
     try {
-      const response = await apiClient.get('/api/share/me');
-      setMyLinks(response.data);
+      const currentSkip = loadMore ? skip + LIMIT : 0;
+      const response = await apiClient.get(`/api/share/me?skip=${currentSkip}&limit=${LIMIT}`);
+      
+      if (loadMore) {
+        setMyLinks(prev => {
+          const validPrev = Array.isArray(prev) ? prev : [];
+          const items = response.data?.items || response.data || [];
+          const validItems = Array.isArray(items) ? items : [];
+          const existingTokens = new Set(validPrev.map((l: any) => l.token));
+          const newItems = validItems.filter((i: any) => !existingTokens.has(i.token));
+          return [...validPrev, ...newItems];
+        });
+        setSkip(currentSkip);
+      } else {
+        const items = response.data?.items || response.data || [];
+        setMyLinks(Array.isArray(items) ? items : []);
+        setSkip(0);
+      }
+      setTotalLinks(response.data?.total || (Array.isArray(response.data) ? response.data.length : 0));
     } catch (error) {
       console.error('Failed to fetch links', error);
     } finally {
       setLinksLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const generateLink = async () => {
-    if (!uri) return;
+  const generateLink = async (overwrite = false) => {
+    if (!uri || !filename) return;
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append('file', { uri, name: filename, type: 'text/markdown' } as any);
+      const normalizedName = normalizeFilename(filename);
+      formData.append('file', { uri, name: normalizedName, type: 'text/markdown' } as any);
       if (expiryHours) formData.append('expires_in_hours', expiryHours.toString());
       formData.append('is_anonymous', isAnonymous.toString());
+      if (overwrite) formData.append('overwrite', 'true');
 
       const response = await apiClient.post('/api/share', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -95,13 +132,18 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
         url: response.data.url,
       });
 
-      fetchMyLinks();
+      setDuplicateModalVisible(false);
+      fetchMyLinks(false);
     } catch (error: any) {
-      const detail = error.response?.data?.detail;
-      const errorMessage = Array.isArray(detail)
-        ? detail.map((d: any) => d.msg).join(', ')
-        : detail || 'Please check your connection';
-      Toast.show({ position: 'bottom', type: 'error', text1: 'Sharing failed', text2: errorMessage });
+      if (error.response?.status === 409) {
+        setDuplicateModalVisible(true);
+      } else {
+        const detail = error.response?.data?.detail;
+        const errorMessage = Array.isArray(detail)
+          ? detail.map((d: any) => d.msg).join(', ')
+          : detail || 'Please check your connection';
+        Toast.show({ position: 'bottom', type: 'error', text1: 'Sharing failed', text2: errorMessage });
+      }
     } finally {
       setLoading(false);
     }
@@ -197,10 +239,21 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
             <ThemedText type="subtitle" style={styles.sectionLabel}>My Links</ThemedText>
           </View>
         }
-        data={[...myLinks]
-          .filter(link => !filename || link.original_filename === filename)
+        data={[...(Array.isArray(myLinks) ? myLinks : [])]
+          .filter(link => {
+            if (!filename) return true;
+            const normName = normalizeFilename(filename);
+            try {
+              return decodeURIComponent(link.original_filename) === decodeURIComponent(normName) || link.original_filename === normName || link.original_filename === filename;
+            } catch {
+              return link.original_filename === normName || link.original_filename === filename;
+            }
+          })
           .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())}
         keyExtractor={(item) => item.token}
+        onEndReached={() => fetchMyLinks(true)}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} /> : null}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
           linksLoading ? (
@@ -283,6 +336,15 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
         onCancel={() => { setRevokeModalVisible(false); setLinkToRevoke(null); }}
         onConfirm={executeRevoke}
         confirmText="Revoke"
+      />
+      <ConfirmModal
+        visible={duplicateModalVisible}
+        title="Duplicate Settings"
+        message="A share link for this file with identical settings already exists. Do you want to overwrite it and create a new link, or keep the existing one?"
+        onCancel={() => setDuplicateModalVisible(false)}
+        onConfirm={() => generateLink(true)}
+        confirmText="Overwrite"
+        cancelText="Cancel"
       />
     </SafeAreaView>
   );
