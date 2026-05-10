@@ -58,18 +58,15 @@ const styles = StyleSheet.create({
   display: {
     fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 40,
-    fontWeight: '700',
     lineHeight: 44,
   },
   title: {
     fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 26,
-    fontWeight: '700',
   },
   subtitle: {
     fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 18,
-    fontWeight: '700',
   },
   body: {
     fontFamily: 'SpaceGrotesk-Regular',
@@ -79,7 +76,6 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: 'SpaceGrotesk-Medium',
     fontSize: 14,
-    fontWeight: '600',
   },
   caption: {
     fontFamily: 'SpaceGrotesk-Regular',
