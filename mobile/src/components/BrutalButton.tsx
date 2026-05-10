@@ -1,59 +1,104 @@
-import React from 'react';
-import { TouchableOpacity, TouchableOpacityProps, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useRef } from 'react';
+import {
+  TouchableOpacity,
+  TouchableOpacityProps,
+  StyleSheet,
+  ActivityIndicator,
+  Animated,
+  View,
+} from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { ThemedText } from './ThemedText';
 
 interface BrutalButtonProps extends TouchableOpacityProps {
   title: string;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'accent' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
+  fullWidth?: boolean;
 }
 
-export const BrutalButton: React.FC<BrutalButtonProps> = ({ 
-  title, 
-  variant = 'primary', 
+export const BrutalButton: React.FC<BrutalButtonProps> = ({
+  title,
+  variant = 'primary',
+  size = 'md',
   loading = false,
-  style, 
-  ...props 
+  fullWidth = false,
+  style,
+  onPress,
+  ...props
 }) => {
   const { colors } = useTheme();
+  const pressed = useRef(new Animated.Value(0)).current;
 
-  const getBackgroundColor = () => {
-    switch (variant) {
-      case 'primary': return colors.primary;
-      case 'danger': return colors.error;
-      case 'secondary': return colors.card;
-      default: return colors.primary;
-    }
+  const bgMap = {
+    primary: colors.primary,
+    secondary: colors.card,
+    accent: colors.accent,
+    danger: colors.error,
   };
 
-  const getTextColor = () => {
-    if (variant === 'primary' || variant === 'danger') return '#111111';
-    return colors.text;
+  const textColorMap = {
+    primary: '#111111',
+    secondary: colors.text,
+    accent: '#111111',
+    danger: '#FFFFFF',
   };
+
+  const handlePressIn = () => {
+    Animated.timing(pressed, { toValue: 1, duration: 60, useNativeDriver: true }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.timing(pressed, { toValue: 0, duration: 100, useNativeDriver: true }).start();
+  };
+
+  // Simulate pressing down: translate + shrink shadow
+  const translateXY = pressed.interpolate({ inputRange: [0, 1], outputRange: [0, 3] });
+  const shadowOpacity = pressed.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+
+  const sizePad = { sm: { paddingVertical: 8, paddingHorizontal: 16 }, md: { paddingVertical: 14, paddingHorizontal: 24 }, lg: { paddingVertical: 18, paddingHorizontal: 32 } }[size];
+  const fontSize = { sm: 13, md: 15, lg: 17 }[size];
 
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        { 
-          backgroundColor: getBackgroundColor(),
-          borderColor: colors.border,
-          shadowColor: colors.shadow,
-        },
-        style,
-      ]}
-      activeOpacity={0.8}
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
       disabled={loading || props.disabled}
+      style={[fullWidth && { width: '100%' }, style]}
       {...props}
     >
-      {loading ? (
-        <ActivityIndicator color={getTextColor()} />
-      ) : (
-        <ThemedText style={[styles.text, { color: getTextColor() }]}>
-          {title}
-        </ThemedText>
-      )}
+      {/* Shadow layer — offset behind button */}
+      <Animated.View
+        style={[
+          styles.shadow,
+          { backgroundColor: colors.shadow, opacity: shadowOpacity },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.button,
+          sizePad,
+          {
+            backgroundColor: bgMap[variant],
+            borderColor: colors.border,
+            transform: [{ translateX: translateXY }, { translateY: translateXY }],
+          },
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator color={textColorMap[variant]} size="small" />
+        ) : (
+          <ThemedText
+            type="label"
+            style={[styles.text, { color: textColorMap[variant], fontSize }]}
+          >
+            {title}
+          </ThemedText>
+        )}
+      </Animated.View>
     </TouchableOpacity>
   );
 };
@@ -61,19 +106,20 @@ export const BrutalButton: React.FC<BrutalButtonProps> = ({
 const styles = StyleSheet.create({
   button: {
     borderWidth: 3,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 8,
-    marginBottom: 8, // Accommodate shadow
+    zIndex: 1,
+  },
+  shadow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: -6,
+    bottom: -6,
+    zIndex: 0,
   },
   text: {
     fontFamily: 'SpaceGrotesk-Bold',
-    fontSize: 16,
-    fontWeight: 'bold',
+    letterSpacing: 0.3,
   },
 });
