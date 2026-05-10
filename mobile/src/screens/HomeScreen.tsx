@@ -18,6 +18,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { syncFilesWithFS, deleteFile as deleteFileFromStore } from '../utils/fileStore';
 
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
@@ -26,7 +27,13 @@ import { useAuth } from '../context/AuthContext';
 
 const DIR_URI = `${(FileSystem as any).documentDirectory}markdown_files/`;
 
-type FileInfo = { name: string; uri: string; size: number; mtime: number };
+interface FileInfo {
+  id?: string;
+  name: string;
+  uri: string;
+  size: number;
+  mtime: number;
+};
 type HomeScreenProps = { navigation: StackNavigationProp<any, any> };
 
 const formatTime = (ts: number) => {
@@ -64,7 +71,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const subFabTimer = React.useRef<NodeJS.Timeout | null>(null);
 
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [fileToDelete, setFileToDelete] = useState<{uri: string, name: string} | null>(null);
+  const [fileToDelete, setFileToDelete] = useState<{id?: string, uri: string, name: string} | null>(null);
 
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
@@ -110,15 +117,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const loadFiles = async () => {
     try {
       const dirInfo = await FileSystem.getInfoAsync(DIR_URI);
-      if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(DIR_URI, { intermediates: true });
-      const contents = await FileSystem.readDirectoryAsync(DIR_URI);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(DIR_URI, { intermediates: true });
+      }
+      
+      const dbFiles = await syncFilesWithFS();
+      
       const infos = await Promise.all(
-        contents.map(async (filename) => {
-          const uri = `${DIR_URI}${filename}`;
-          const info = await FileSystem.getInfoAsync(uri);
-          return { 
-            name: filename, 
-            uri, 
+        (dbFiles || []).map(async (f) => {
+          const info = await FileSystem.getInfoAsync(f.uri);
+          return {
+            id: f.id,
+            name: f.filename, 
+            uri: f.uri, 
             size: info.exists ? (info as any).size ?? 0 : 0,
             mtime: info.exists ? (info as any).modificationTime ?? 0 : 0
           };
@@ -174,17 +185,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     } catch (err) { console.error(err); }
   };
 
-  const confirmDelete = (uri: string, name: string) => {
-    setFileToDelete({ uri, name: name.replace('.md', '') });
+  const confirmDelete = (id: string | undefined, uri: string, name: string) => {
+    setFileToDelete({ id, uri, name: name.replace('.md', '') });
     setDeleteConfirmVisible(true);
   };
 
   const executeDelete = async () => {
     if (fileToDelete) {
-      await FileSystem.deleteAsync(fileToDelete.uri);
-      setFileToDelete(null);
-      setDeleteConfirmVisible(false);
-      await loadFiles();
+      try {
+        await FileSystem.deleteAsync(fileToDelete.uri, { idempotent: true });
+        if (fileToDelete.id) {
+          await deleteFileFromStore(fileToDelete.id);
+        }
+        setFileToDelete(null);
+        setDeleteConfirmVisible(false);
+        await loadFiles();
+        Toast.show({
+          type: 'success',
+          text1: 'Deleted successfully',
+          position: 'bottom',
+        });
+      } catch (error) {
+        console.error('Delete error:', error);
+      }
     }
   };
 
@@ -268,10 +291,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         )}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('Editor', { uri: item.uri, name: item.name })}
-          >
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('Editor', { uri: item.uri, name: item.name, fileId: item.id })}
+            >
             <ThemedView card style={styles.fileCard}>
               {/* File icon badge */}
               <View style={[styles.fileIconBadge, { backgroundColor: colors.primary, borderColor: colors.border }]}>
@@ -287,7 +310,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
               <View style={styles.fileActions}>
                 <TouchableOpacity
-                  onPress={() => confirmDelete(item.uri, item.name)}
+                  onPress={() => confirmDelete(item.id, item.uri, item.name)}
                   style={styles.deleteButton}
                   accessibilityLabel={`Delete ${item.name}`}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -303,14 +326,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       {/* ─── Expandable FAB ──────────────────────── */}
       <View style={styles.fabContainer}>
-        {/* Link Button */}
+        {/* All Links Button */}
         <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -195] }) }, { scale: fabAnim }] }]}>
-            <TouchableOpacity onPress={() => { closeFab(); Toast.show({ position: 'bottom', type: 'info', text1: 'Coming soon!' }); }} activeOpacity={0.85}>
+            <TouchableOpacity onPress={() => { closeFab(); navigation.navigate('Share', {}); }} activeOpacity={0.85}>
               <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
                 <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
-                  From Link
+                  All Shared Links
                 </Animated.Text>
-                <Ionicons name="link-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
+                <Ionicons name="share-social-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
               </Animated.View>
             </TouchableOpacity>
         </Animated.View>

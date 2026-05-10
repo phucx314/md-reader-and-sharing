@@ -34,6 +34,7 @@ type GeneratedLink = {
   token: string;
   url: string;
   original_filename: string;
+  local_file_id: string | null;
   is_anonymous: boolean;
   created_at: string;
   expires_at: string | null;
@@ -57,7 +58,7 @@ const normalizeFilename = (str: string) => {
 };
 
 export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) => {
-  const { uri, filename } = route.params || {};
+  const { uri, filename, fileId } = route.params || {};
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [expiryHours, setExpiryHours] = useState<number | null>(24);
   const [loading, setLoading] = useState(false);
@@ -75,8 +76,13 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
   useEffect(() => { fetchMyLinks(); }, []);
 
   const fetchMyLinks = async (loadMore = false) => {
+    console.log(`\n\n[DEBUG ShareScreen] fetchMyLinks called with loadMore=${loadMore}`);
+    console.log(`[DEBUG ShareScreen] current state: myLinks.length=${myLinks.length}, totalLinks=${totalLinks}, skip=${skip}, fileId=${fileId}, filename=${filename}`);
     if (loadMore) {
-      if (myLinks.length >= totalLinks || loadingMore) return;
+      if (myLinks.length >= totalLinks || loadingMore) {
+        console.log(`[DEBUG ShareScreen] returning early from loadMore: myLinks.length (${myLinks.length}) >= totalLinks (${totalLinks}) OR loadingMore (${loadingMore}) is true`);
+        return;
+      }
       setLoadingMore(true);
     } else {
       setLinksLoading(true);
@@ -85,11 +91,15 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
     try {
       const currentSkip = loadMore ? skip + LIMIT : 0;
       let url = `/api/share/me?skip=${currentSkip}&limit=${LIMIT}`;
-      if (filename) {
+      if (fileId) {
+        url += `&local_file_id=${fileId}`;
+      } else if (filename) {
         url += `&filename=${encodeURIComponent(normalizeFilename(filename))}&fallback=${encodeURIComponent(filename)}`;
       }
+      console.log(`[DEBUG ShareScreen] Fetching URL: ${url}`);
       const response = await apiClient.get(url);
-      
+      console.log(`[DEBUG ShareScreen] API Response: total=${response.data?.total}, items length=${response.data?.items?.length || 0}`);
+
       if (loadMore) {
         setMyLinks(prev => {
           const validPrev = Array.isArray(prev) ? prev : [];
@@ -97,24 +107,30 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
           const validItems = Array.isArray(items) ? items : [];
           const existingTokens = new Set(validPrev.map((l: any) => l.token));
           const newItems = validItems.filter((i: any) => !existingTokens.has(i.token));
+          console.log(`[DEBUG ShareScreen] loadMore=true. Prev length=${validPrev.length}, newly fetched items=${validItems.length}, actually added (not dupes)=${newItems.length}`);
           return [...validPrev, ...newItems];
         });
         setSkip(currentSkip);
       } else {
         const items = response.data?.items || response.data || [];
-        setMyLinks(Array.isArray(items) ? items : []);
+        const validItems = Array.isArray(items) ? items : [];
+        console.log(`[DEBUG ShareScreen] loadMore=false. Setting myLinks to exactly these ${validItems.length} items.`);
+        validItems.forEach((i: any, idx: number) => console.log(`   item ${idx}: token=${i.token}, local_file_id=${i.local_file_id}, orig_name=${i.original_filename}`));
+        setMyLinks(validItems);
         setSkip(0);
       }
-      setTotalLinks(response.data?.total || (Array.isArray(response.data) ? response.data.length : 0));
+      const newTotal = response.data?.total || (Array.isArray(response.data) ? response.data.length : 0);
+      console.log(`[DEBUG ShareScreen] Setting totalLinks to: ${newTotal}`);
+      setTotalLinks(newTotal);
     } catch (error) {
-      console.error('Failed to fetch links', error);
+      console.error('[DEBUG ShareScreen] Failed to fetch links', error);
     } finally {
       setLinksLoading(false);
       setLoadingMore(false);
     }
   };
 
-  const generateLink = async (overwrite = false) => {
+  const generateLink = async (overwrite = false, forceNew = false) => {
     if (!uri || !filename) return;
     setLoading(true);
     try {
@@ -124,6 +140,8 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
       if (expiryHours) formData.append('expires_in_hours', expiryHours.toString());
       formData.append('is_anonymous', isAnonymous.toString());
       if (overwrite) formData.append('overwrite', 'true');
+      if (forceNew) formData.append('force_new', 'true');
+      if (fileId) formData.append('local_file_id', fileId);
 
       const response = await apiClient.post('/api/share', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -136,8 +154,11 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
         url: response.data.url,
       });
 
-      setDuplicateModalVisible(false);
+      // When overwrite is true, the backend DELETES the old links for this file.
+      // So we must fetch the fresh list from the backend to reflect the true state.
       fetchMyLinks(false);
+
+      setDuplicateModalVisible(false);
     } catch (error: any) {
       if (error.response?.status === 409) {
         setDuplicateModalVisible(true);
@@ -233,7 +254,7 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
 
                 <BrutalButton
                   title="Generate & Share Link"
-                  onPress={generateLink}
+                  onPress={() => generateLink()}
                   loading={loading}
                   fullWidth
                 />
@@ -245,12 +266,23 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
         }
         data={[...(Array.isArray(myLinks) ? myLinks : [])]
           .filter(link => {
+            if (fileId && link.local_file_id) {
+              const matches = link.local_file_id === fileId;
+              if (!matches) console.log(`[DEBUG ShareScreen] Filtered OUT item ${link.token}: local_file_id ${link.local_file_id} !== ${fileId}`);
+              return matches;
+            }
             if (!filename) return true;
             const normName = normalizeFilename(filename);
             try {
-              return decodeURIComponent(link.original_filename) === decodeURIComponent(normName) || link.original_filename === normName || link.original_filename === filename;
+              const decodedOriginal = decodeURIComponent(link.original_filename);
+              const decodedNorm = decodeURIComponent(normName);
+              const matches = decodedOriginal === decodedNorm || link.original_filename === normName || link.original_filename === filename;
+              if (!matches) console.log(`[DEBUG ShareScreen] Filtered OUT item ${link.token}: no match for filename ${filename}`);
+              return matches;
             } catch {
-              return link.original_filename === normName || link.original_filename === filename;
+              const matches = link.original_filename === normName || link.original_filename === filename;
+              if (!matches) console.log(`[DEBUG ShareScreen] Filtered OUT item ${link.token}: no match for filename ${filename}`);
+              return matches;
             }
           })
           .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())}
@@ -343,12 +375,18 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
       />
       <ConfirmModal
         visible={duplicateModalVisible}
-        title="Duplicate Settings"
-        message="A share link for this file with identical settings already exists. Do you want to overwrite it and create a new link, or keep the existing one?"
-        onCancel={() => setDuplicateModalVisible(false)}
-        onConfirm={() => generateLink(true)}
-        confirmText="Overwrite"
-        cancelText="Cancel"
+        title="Link Already Exists"
+        message="One or more identical active share links for this file already exist. What would you like to do?"
+        cancelText="New Link"
+        confirmText="Overwrite All"
+        onCancel={() => {
+          setDuplicateModalVisible(false);
+          generateLink(false, true);
+        }}
+        onConfirm={() => {
+          setDuplicateModalVisible(false);
+          generateLink(true, false);
+        }}
       />
     </SafeAreaView>
   );

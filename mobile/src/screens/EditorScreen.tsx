@@ -16,7 +16,9 @@ import { RouteProp } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
 
+import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
+import { saveFile, generateUUID } from '../utils/fileStore';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -51,10 +53,11 @@ const formatTime = (ts: number) => {
 };
 
 export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route }) => {
-  const { uri: initialUri, name: initialName, isNew } = route.params || {};
+  const { uri: initialUri, name: initialName, isNew, fileId: initialFileId } = route.params || {};
   const [content, setContent] = useState('');
   const [filename, setFilename] = useState(initialName ? initialName.replace('.md', '') : 'Untitled');
   const [uri, setUri] = useState<string | null>(initialUri || null);
+  const [fileId, setFileId] = useState<string | null>(initialFileId || null);
   const [isPreview, setIsPreview] = useState(false);
   const [lastModified, setLastModified] = useState<number>(0);
   const { colors, isDark } = useTheme();
@@ -81,15 +84,37 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
     const safeName = filename.trim() || 'Untitled';
     const finalFilename = `${safeName}.md`;
     let targetUri = uri;
+    let currentFileId = fileId;
     try {
       if (!targetUri) {
         const dirInfo = await FileSystem.getInfoAsync(DIR_URI);
-        if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(DIR_URI, { intermediates: true });
+        if (!dirInfo.exists) {
+          await FileSystem.makeDirectoryAsync(DIR_URI, { intermediates: true });
+        }
         targetUri = `${DIR_URI}${finalFilename}`;
+        currentFileId = generateUUID();
+        setFileId(currentFileId);
       } else if (initialName !== finalFilename) {
         targetUri = `${DIR_URI}${finalFilename}`;
+        if (uri && uri !== targetUri) {
+          try {
+            await FileSystem.moveAsync({ from: uri, to: targetUri });
+          } catch (err) {
+            console.error('Failed to move file', err);
+          }
+        }
       }
       await FileSystem.writeAsStringAsync(targetUri, content);
+      
+      if (currentFileId) {
+        await saveFile({
+          id: currentFileId,
+          filename: finalFilename,
+          uri: targetUri,
+          createdAt: Date.now()
+        });
+      }
+      
       setUri(targetUri);
       const info = await FileSystem.getInfoAsync(targetUri);
       if (info.exists) {
@@ -112,7 +137,7 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
       navigation.navigate('Auth');
       return;
     }
-    navigation.navigate('Share', { uri: savedUri, filename: `${filename}.md` });
+    navigation.navigate('Share', { uri: savedUri, filename: `${filename}.md`, fileId });
   };
 
   const markdownStyles = {
