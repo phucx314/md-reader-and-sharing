@@ -183,29 +183,48 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
   };
 
   const handleSave = async (silent = false): Promise<string | null> => {
-    const safeName = filename.trim() || 'Untitled';
-    const finalFilename = `${safeName}.md`;
+    let safeName = filename.trim() || 'Untitled';
+    let finalFilename = `${safeName}.md`;
     let targetUri = uri;
     let currentFileId = fileId;
     try {
-      if (!targetUri) {
-        const dirInfo = await FileSystem.getInfoAsync(DIR_URI);
-        if (!dirInfo.exists) {
-          await FileSystem.makeDirectoryAsync(DIR_URI, { intermediates: true });
+      const dirInfo = await FileSystem.getInfoAsync(DIR_URI);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(DIR_URI, { intermediates: true });
+      }
+
+      if (!targetUri || initialName !== finalFilename) {
+        let uniqueFilename = finalFilename;
+        let counter = 1;
+        while (true) {
+          const checkUri = `${DIR_URI}${uniqueFilename}`;
+          if (targetUri && checkUri === uri) break;
+          const checkInfo = await FileSystem.getInfoAsync(checkUri);
+          if (!checkInfo.exists) break;
+          uniqueFilename = `${safeName} (${counter}).md`;
+          counter++;
         }
-        targetUri = `${DIR_URI}${finalFilename}`;
-        currentFileId = generateUUID();
-        setFileId(currentFileId);
-      } else if (initialName !== finalFilename) {
-        targetUri = `${DIR_URI}${finalFilename}`;
-        if (uri && uri !== targetUri) {
+        finalFilename = uniqueFilename;
+        safeName = uniqueFilename.replace('.md', '');
+        if (filename !== safeName) setFilename(safeName);
+
+        const newTargetUri = `${DIR_URI}${finalFilename}`;
+        
+        if (targetUri && uri !== newTargetUri) {
           try {
-            await FileSystem.moveAsync({ from: uri, to: targetUri });
+            await FileSystem.moveAsync({ from: uri, to: newTargetUri });
           } catch (err) {
             console.error('Failed to move file', err);
           }
         }
+        targetUri = newTargetUri;
+        
+        if (!currentFileId) {
+          currentFileId = generateUUID();
+          setFileId(currentFileId);
+        }
       }
+
       await FileSystem.writeAsStringAsync(targetUri, content);
       
       if (currentFileId) {
