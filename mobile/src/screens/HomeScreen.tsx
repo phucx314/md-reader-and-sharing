@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   RefreshControl,
   Pressable,
+  Alert,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -13,6 +15,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
@@ -52,6 +55,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const { colors, isDark, toggleTheme } = useTheme();
   const { token, logout } = useAuth();
+  
+  const [isFabOpen, setIsFabOpen] = useState(false);
+  const fabAnim = React.useRef(new Animated.Value(0)).current;
+
+  const toggleFab = () => {
+    const toValue = isFabOpen ? 0 : 1;
+    Animated.spring(fabAnim, {
+      toValue,
+      friction: 5,
+      tension: 60,
+      useNativeDriver: true,
+    }).start();
+    setIsFabOpen(!isFabOpen);
+  };
+
+  const closeFab = () => {
+    if (isFabOpen) toggleFab();
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: logout },
+    ]);
+  };
 
   const loadFiles = async () => {
     try {
@@ -120,9 +148,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     } catch (err) { console.error(err); }
   };
 
-  const deleteFile = async (uri: string) => {
-    await FileSystem.deleteAsync(uri);
-    await loadFiles();
+  const confirmDelete = (uri: string, name: string) => {
+    Alert.alert('Delete File', `Are you sure you want to delete "${name.replace('.md', '')}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteFile(uri) },
+    ]);
   };
 
   return (
@@ -148,7 +178,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Ionicons name={isDark ? 'sunny' : 'moon'} size={22} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={token ? logout : () => navigation.navigate('Auth')}
+            onPress={token ? handleLogout : () => navigation.navigate('Auth')}
             style={styles.iconButton}
             accessibilityLabel={token ? 'Log out' : 'Log in'}
           >
@@ -197,7 +227,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
               <View style={styles.fileActions}>
                 <TouchableOpacity
-                  onPress={() => deleteFile(item.uri)}
+                  onPress={() => confirmDelete(item.uri, item.name)}
                   style={styles.deleteButton}
                   accessibilityLabel={`Delete ${item.name}`}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -211,18 +241,70 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         )}
       />
 
-      {/* ─── FAB ──────────────────────────────────── */}
-      <TouchableOpacity
-        style={styles.fabContainer}
-        onPress={() => navigation.navigate('Editor', { isNew: true })}
-        activeOpacity={0.85}
-        accessibilityLabel="Create new file"
-      >
-        <View style={[styles.fabShadow, { backgroundColor: colors.shadow }]} />
-        <View style={[styles.fab, { backgroundColor: colors.primary, borderColor: colors.border }]}>
-          <Ionicons name="add" size={30} color="#111" />
-        </View>
-      </TouchableOpacity>
+      {/* ─── Expandable FAB ──────────────────────── */}
+      <View style={styles.fabContainer}>
+        {/* Link Button */}
+        <Animated.View style={[styles.subFabContainer, {
+          transform: [
+            { scale: fabAnim },
+            { translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -195] }) },
+          ],
+        }]}>
+          <TouchableOpacity
+            style={[styles.subFab, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => { closeFab(); Toast.show({ position: 'bottom', type: 'info', text1: 'Coming soon!' }); }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="link-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Import Button */}
+        <Animated.View style={[styles.subFabContainer, {
+          transform: [
+            { scale: fabAnim },
+            { translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -130] }) },
+          ],
+        }]}>
+          <TouchableOpacity
+            style={[styles.subFab, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => { closeFab(); importFile(); }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* New Button */}
+        <Animated.View style={[styles.subFabContainer, {
+          transform: [
+            { scale: fabAnim },
+            { translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -65] }) },
+          ],
+        }]}>
+          <TouchableOpacity
+            style={[styles.subFab, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => { closeFab(); navigation.navigate('Editor', { isNew: true }); }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="document-text-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Main FAB */}
+        <TouchableOpacity
+          style={styles.mainFabWrap}
+          onPress={toggleFab}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.fabShadow, { backgroundColor: colors.shadow }]} />
+          <Animated.View style={[styles.fab, { backgroundColor: colors.primary, borderColor: colors.border }, {
+            transform: [{ rotate: fabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) }],
+          }]}>
+            <Ionicons name="add" size={30} color="#111" />
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -289,6 +371,26 @@ const styles = StyleSheet.create({
     right: 28,
     width: 60,
     height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainFabWrap: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+  },
+  subFabContainer: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+  },
+  subFab: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fabShadow: {
     position: 'absolute',
