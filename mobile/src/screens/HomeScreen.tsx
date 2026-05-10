@@ -56,7 +56,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [sections, setSections] = useState<{ title: string; data: FileInfo[] }[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const { colors, isDark, toggleTheme } = useTheme();
-  const { token, logout } = useAuth();
+  const { token, username, logout } = useAuth();
   
   const [isFabOpen, setIsFabOpen] = useState(false);
   const fabAnim = React.useRef(new Animated.Value(0)).current;
@@ -191,7 +191,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const renderAvatar = () => (
     <View style={[styles.avatarCircle, { borderColor: colors.border, backgroundColor: colors.primary }]}>
       {token ? (
-        <ThemedText style={{ fontFamily: 'SpaceGrotesk-Bold', color: '#111' }}>U</ThemedText>
+        <ThemedText style={{ fontFamily: 'SpaceGrotesk-Bold', color: '#111' }}>
+          {username ? username.charAt(0).toUpperCase() : 'U'}
+        </ThemedText>
       ) : (
         <Ionicons name="person" size={16} color="#111" />
       )}

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
-  Switch,
   Share,
   FlatList,
   TouchableOpacity,
@@ -20,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
 import { BrutalButton } from '../components/BrutalButton';
+import { BrutalSwitch } from '../components/BrutalSwitch';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 
@@ -34,6 +35,7 @@ type GeneratedLink = {
   url: string;
   original_filename: string;
   is_anonymous: boolean;
+  created_at: string;
   expires_at: string | null;
 };
 
@@ -56,6 +58,8 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
   const [loading, setLoading] = useState(false);
   const [linksLoading, setLinksLoading] = useState(true);
   const [myLinks, setMyLinks] = useState<GeneratedLink[]>([]);
+  const [revokeModalVisible, setRevokeModalVisible] = useState(false);
+  const [linkToRevoke, setLinkToRevoke] = useState<string | null>(null);
   const { colors } = useTheme();
 
   useEffect(() => { fetchMyLinks(); }, []);
@@ -104,23 +108,21 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
   };
 
   const confirmRevoke = (token: string) => {
-    Alert.alert(
-      'Revoke Link',
-      'This will permanently delete the share link. Anyone with the link will lose access.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Revoke', style: 'destructive', onPress: () => revokeLink(token) },
-      ]
-    );
+    setLinkToRevoke(token);
+    setRevokeModalVisible(true);
   };
 
-  const revokeLink = async (token: string) => {
+  const executeRevoke = async () => {
+    if (!linkToRevoke) return;
     try {
-      await apiClient.delete(`/api/share/${token}`);
+      await apiClient.delete(`/api/share/${linkToRevoke}`);
       Toast.show({ position: 'bottom', type: 'success', text1: 'Link revoked' });
       fetchMyLinks();
     } catch {
       Toast.show({ position: 'bottom', type: 'error', text1: 'Failed to revoke link' });
+    } finally {
+      setRevokeModalVisible(false);
+      setLinkToRevoke(null);
     }
   };
 
@@ -169,11 +171,9 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
                     <ThemedText type="label">Share Anonymously</ThemedText>
                     <ThemedText type="caption" muted>Hide your username from viewers</ThemedText>
                   </View>
-                  <Switch
+                  <BrutalSwitch
                     value={isAnonymous}
                     onValueChange={setIsAnonymous}
-                    trackColor={{ false: '#767577', true: colors.primary }}
-                    thumbColor="#111"
                   />
                 </View>
 
@@ -197,7 +197,7 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
             <ThemedText type="subtitle" style={styles.sectionLabel}>My Links</ThemedText>
           </View>
         }
-        data={myLinks}
+        data={[...myLinks].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())}
         keyExtractor={(item) => item.token}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
@@ -258,6 +258,15 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
           );
         }}
       />
+
+      <ConfirmModal
+        visible={revokeModalVisible}
+        title="Revoke Link"
+        message="This will permanently delete the share link. Anyone with the link will lose access."
+        onCancel={() => { setRevokeModalVisible(false); setLinkToRevoke(null); }}
+        onConfirm={executeRevoke}
+        confirmText="Revoke"
+      />
     </SafeAreaView>
   );
 };
@@ -273,7 +282,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
   },
   iconButton: { padding: 8 },
-  content: { padding: 16 },
+  content: { paddingTop: 16, paddingBottom: 8 },
   configCard: { marginBottom: 24 },
   sectionLabel: { marginBottom: 14 },
   row: {
