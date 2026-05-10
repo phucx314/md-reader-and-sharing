@@ -243,7 +243,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.uri}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={colors.primary} 
+            colors={['#111']} 
+            progressBackgroundColor={colors.primary} 
+          />
+        }
         contentContainerStyle={[styles.list, files.length === 0 && styles.listEmpty]}
         ListEmptyComponent={() => (
           <View style={styles.emptyState}>

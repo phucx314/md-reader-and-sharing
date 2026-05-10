@@ -51,6 +51,8 @@ export const BrutalInput: React.FC<BrutalInputProps> = ({
             style,
           ]}
           placeholderTextColor={isDark ? '#777' : '#999'}
+          cursorColor={colors.primary}
+          selectionColor={colors.primary}
           {...props}
         />
       </View>

@@ -145,6 +145,8 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
           onChangeText={setFilename}
           placeholder="Filename"
           placeholderTextColor={isDark ? '#888' : '#999'}
+          cursorColor={colors.primary}
+          selectionColor={colors.primary}
           onBlur={handleSave}
           selectTextOnFocus
         />
@@ -208,6 +210,8 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
               textAlignVertical="top"
               placeholder={"# Start writing…\n\nMarkdown is supported."}
               placeholderTextColor={isDark ? '#555' : '#aaa'}
+              cursorColor={colors.primary}
+              selectionColor={colors.primary}
               scrollEnabled={false} // Disable inner scroll so the outer ScrollView handles it
             />
           </ScrollView>
