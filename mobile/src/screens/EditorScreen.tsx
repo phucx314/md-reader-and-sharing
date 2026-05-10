@@ -18,9 +18,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { saveFile, generateUUID } from '../utils/fileStore';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { apiClient } from '../api/client';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useRef } from 'react';
 
 type EditorScreenProps = {
   navigation: StackNavigationProp<any, any>;
@@ -60,8 +64,102 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
   const [fileId, setFileId] = useState<string | null>(initialFileId || null);
   const [isPreview, setIsPreview] = useState(false);
   const [lastModified, setLastModified] = useState<number>(0);
+  const [isDirty, setIsDirty] = useState(false);
+  const [discardModalVisible, setDiscardModalVisible] = useState(false);
+  const [pendingAction, setPendingAction] = useState<any>(null);
+  
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const [isShared, setIsShared] = useState<boolean>(false);
+  const isUndoRedoAction = useRef(false);
+
   const { colors, isDark } = useTheme();
   const { token } = useAuth();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!fileId || !token) return;
+      const checkShared = async () => {
+        try {
+          const response = await apiClient.get(`/api/share/me?skip=0&limit=1&local_file_id=${fileId}`);
+          if (response.data && response.data.total > 0) {
+            setIsShared(true);
+          } else {
+            setIsShared(false);
+          }
+        } catch (err) {
+          // ignore
+        }
+      };
+      checkShared();
+    }, [fileId, token])
+  );
+
+  // Auto-save timer
+  useEffect(() => {
+    if (!isDirty) return;
+    const timer = setTimeout(() => {
+      handleSave(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [content, filename, isDirty]);
+
+  // Handle back navigation when dirty
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!isDirty) {
+        return;
+      }
+      e.preventDefault();
+      setPendingAction(() => e.data.action);
+      setDiscardModalVisible(true);
+    });
+    return unsubscribe;
+  }, [navigation, isDirty]);
+
+  // If auto-save completes while the modal is open, just dismiss and proceed
+  useEffect(() => {
+    if (!isDirty && discardModalVisible && pendingAction) {
+      setDiscardModalVisible(false);
+      navigation.dispatch(pendingAction);
+    }
+  }, [isDirty, discardModalVisible, pendingAction]);
+
+  useEffect(() => {
+    if (isUndoRedoAction.current) {
+      isUndoRedoAction.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (history[historyIndex] !== content) {
+        const newHistory = history.slice(0, historyIndex + 1);
+        newHistory.push(content);
+        setHistory(newHistory);
+        setHistoryIndex(newHistory.length - 1);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [content, history, historyIndex]);
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      isUndoRedoAction.current = true;
+      const prevContent = history[historyIndex - 1];
+      setContent(prevContent);
+      setHistoryIndex(historyIndex - 1);
+      setIsDirty(true);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      isUndoRedoAction.current = true;
+      const nextContent = history[historyIndex + 1];
+      setContent(nextContent);
+      setHistoryIndex(historyIndex + 1);
+      setIsDirty(true);
+    }
+  };
 
   useEffect(() => {
     if (initialUri && !isNew) loadContent(initialUri);
@@ -69,18 +167,22 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
 
   const loadContent = async (fileUri: string) => {
     try {
-      setContent(await FileSystem.readAsStringAsync(fileUri));
+      const text = await FileSystem.readAsStringAsync(fileUri);
+      setContent(text);
+      setHistory([text]);
+      setHistoryIndex(0);
       const info = await FileSystem.getInfoAsync(fileUri);
       if (info.exists) {
         setLastModified((info as any).modificationTime ?? 0);
       }
+      setIsDirty(false);
     } catch (e) {
       console.error('Failed to read file', e);
       Toast.show({ position: 'bottom', type: 'error', text1: 'Failed to open file' });
     }
   };
 
-  const handleSave = async (): Promise<string | null> => {
+  const handleSave = async (silent = false): Promise<string | null> => {
     const safeName = filename.trim() || 'Untitled';
     const finalFilename = `${safeName}.md`;
     let targetUri = uri;
@@ -116,15 +218,20 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
       }
       
       setUri(targetUri);
+      setIsDirty(false);
       const info = await FileSystem.getInfoAsync(targetUri);
       if (info.exists) {
         setLastModified((info as any).modificationTime ?? 0);
       }
-      Toast.show({ position: 'bottom', type: 'success', text1: 'Saved!' });
+      if (!silent) {
+        Toast.show({ position: 'bottom', type: 'success', text1: 'Saved!' });
+      }
       return targetUri;
     } catch (e) {
       console.error('Failed to save file', e);
-      Toast.show({ position: 'bottom', type: 'error', text1: 'Failed to save' });
+      if (!silent) {
+        Toast.show({ position: 'bottom', type: 'error', text1: 'Failed to save' });
+      }
       return null;
     }
   };
@@ -167,18 +274,27 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
         <TextInput
           style={[styles.filenameInput, { color: colors.text }]}
           value={filename}
-          onChangeText={setFilename}
+          onChangeText={(text) => { setFilename(text); setIsDirty(true); }}
           placeholder="Filename"
           placeholderTextColor={isDark ? '#888' : '#999'}
           cursorColor={colors.primary}
           selectionColor={colors.primary}
-          onBlur={handleSave}
+          onBlur={() => handleSave(true)}
           selectTextOnFocus
         />
 
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={handleSave} style={styles.headerBtn} accessibilityLabel="Save">
+          <TouchableOpacity onPress={handleUndo} disabled={historyIndex <= 0} style={styles.headerBtn} accessibilityLabel="Undo">
+            <Ionicons name="arrow-undo-outline" size={22} color={historyIndex <= 0 ? (isDark ? '#555' : '#ccc') : colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleRedo} disabled={historyIndex >= history.length - 1} style={styles.headerBtn} accessibilityLabel="Redo">
+            <Ionicons name="arrow-redo-outline" size={22} color={historyIndex >= history.length - 1 ? (isDark ? '#555' : '#ccc') : colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleSave(false)} style={styles.headerBtn} accessibilityLabel="Save">
             <Ionicons name="save-outline" size={22} color={colors.text} />
+            {isDirty && (
+              <View style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} />
+            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={handleShare} style={styles.headerBtn} accessibilityLabel="Share">
             <Ionicons name="share-social-outline" size={22} color={colors.text} />
@@ -198,7 +314,7 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggleOption, isPreview && { backgroundColor: colors.primary }]}
-            onPress={() => { handleSave(); setIsPreview(true); }}
+            onPress={() => setIsPreview(true)}
           >
             <Ionicons name="eye-outline" size={14} color={isPreview ? '#111' : colors.text} style={{ marginRight: 4 }} />
             <ThemedText type="caption" style={{ color: isPreview ? '#111' : colors.text, fontFamily: 'SpaceGrotesk-Bold' }}>Preview</ThemedText>
@@ -207,7 +323,7 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
 
         <View style={{ alignItems: 'flex-end' }}>
           <ThemedText type="caption" muted style={styles.wordCount}>
-            {content.split(/\s+/).filter(Boolean).length} words
+            {content.split(/\s+/).filter(Boolean).length} words {fileId ? `• ${isShared ? 'Shared' : 'Not shared'}` : ''}
           </ThemedText>
           {lastModified > 0 && (
             <ThemedText type="caption" muted style={{ fontSize: 11, marginTop: 2 }}>
@@ -230,7 +346,7 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
             <TextInput
               style={[styles.editor, { color: colors.text }]}
               value={content}
-              onChangeText={setContent}
+              onChangeText={(text) => { setContent(text); setIsDirty(true); }}
               multiline
               textAlignVertical="top"
               placeholder={"# Start writing…\n\nMarkdown is supported."}
@@ -242,6 +358,28 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
           </ScrollView>
         )}
       </KeyboardAvoidingView>
+
+      <ConfirmModal
+        visible={discardModalVisible}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Do you want to save or discard them?"
+        cancelText="Discard"
+        confirmText="Save"
+        onCancel={() => {
+          setDiscardModalVisible(false);
+          setIsDirty(false);
+          navigation.dispatch(pendingAction);
+        }}
+        onDismiss={() => {
+          setDiscardModalVisible(false);
+          // Stay on the screen and do nothing else
+        }}
+        onConfirm={async () => {
+          setDiscardModalVisible(false);
+          await handleSave();
+          navigation.dispatch(pendingAction);
+        }}
+      />
     </SafeAreaView>
   );
 };
