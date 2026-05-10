@@ -326,14 +326,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       {/* ─── Expandable FAB ──────────────────────── */}
       <View style={styles.fabContainer}>
-        {/* All Links Button */}
+        {/* Import Link Button */}
         <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -195] }) }, { scale: fabAnim }] }]}>
-            <TouchableOpacity onPress={() => { closeFab(); navigation.navigate('Share', {}); }} activeOpacity={0.85}>
+            <TouchableOpacity onPress={() => { closeFab(); Toast.show({ position: 'bottom', type: 'info', text1: 'Feature coming soon!' }); }} activeOpacity={0.85}>
               <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
                 <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
-                  All Shared Links
+                  Import Link
                 </Animated.Text>
-                <Ionicons name="share-social-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
+                <Ionicons name="link-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
               </Animated.View>
             </TouchableOpacity>
         </Animated.View>
@@ -384,6 +384,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); Toast.show({ position: 'bottom', type: 'info', text1: 'Coming soon!' }); }}>
               <Ionicons name="person-outline" size={20} color={colors.text} />
               <ThemedText style={styles.menuText}>Profile</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); navigation.navigate('Share', {}); }}>
+              <Ionicons name="link-outline" size={20} color={colors.text} />
+              <ThemedText style={styles.menuText}>My Links</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); Toast.show({ position: 'bottom', type: 'info', text1: 'Coming soon!' }); }}>
               <Ionicons name="settings-outline" size={20} color={colors.text} />
