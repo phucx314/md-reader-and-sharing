@@ -8,6 +8,7 @@ import {
   Pressable,
   Alert,
   Animated,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -16,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
@@ -58,6 +60,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   
   const [isFabOpen, setIsFabOpen] = useState(false);
   const fabAnim = React.useRef(new Animated.Value(0)).current;
+  const subFabExtendedAnim = React.useRef(new Animated.Value(1)).current;
+  const subFabTimer = React.useRef<NodeJS.Timeout | null>(null);
+
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<{uri: string, name: string} | null>(null);
+
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [profileMenuVisible, setProfileMenuVisible] = useState(false);
 
   const toggleFab = () => {
     const toValue = isFabOpen ? 0 : 1;
@@ -67,18 +77,34 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       tension: 60,
       useNativeDriver: true,
     }).start();
+    
+    if (!isFabOpen) {
+      // Opening
+      subFabExtendedAnim.setValue(1);
+      if (subFabTimer.current) clearTimeout(subFabTimer.current);
+      subFabTimer.current = setTimeout(() => {
+        Animated.timing(subFabExtendedAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }).start();
+      }, 3000);
+    } else {
+      // Closing
+      if (subFabTimer.current) clearTimeout(subFabTimer.current);
+    }
+    
     setIsFabOpen(!isFabOpen);
   };
+
 
   const closeFab = () => {
     if (isFabOpen) toggleFab();
   };
 
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: logout },
-    ]);
+    setLogoutConfirmVisible(false);
+    logout();
   };
 
   const loadFiles = async () => {
@@ -149,11 +175,38 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   const confirmDelete = (uri: string, name: string) => {
-    Alert.alert('Delete File', `Are you sure you want to delete "${name.replace('.md', '')}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteFile(uri) },
-    ]);
+    setFileToDelete({ uri, name: name.replace('.md', '') });
+    setDeleteConfirmVisible(true);
   };
+
+  const executeDelete = async () => {
+    if (fileToDelete) {
+      await FileSystem.deleteAsync(fileToDelete.uri);
+      setFileToDelete(null);
+      setDeleteConfirmVisible(false);
+      await loadFiles();
+    }
+  };
+
+  const renderAvatar = () => (
+    <View style={[styles.avatarCircle, { borderColor: colors.border, backgroundColor: colors.primary }]}>
+      {token ? (
+        <ThemedText style={{ fontFamily: 'SpaceGrotesk-Bold', color: '#111' }}>U</ThemedText>
+      ) : (
+        <Ionicons name="person" size={16} color="#111" />
+      )}
+    </View>
+  );
+
+  const subFabWidth = subFabExtendedAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [48, 140],
+  });
+
+  const subFabTextOpacity = subFabExtendedAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -171,18 +224,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={importFile} style={styles.iconButton} accessibilityLabel="Import file">
-            <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
-          </TouchableOpacity>
           <TouchableOpacity onPress={toggleTheme} style={styles.iconButton} accessibilityLabel="Toggle theme">
             <Ionicons name={isDark ? 'sunny' : 'moon'} size={22} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={token ? handleLogout : () => navigation.navigate('Auth')}
-            style={styles.iconButton}
-            accessibilityLabel={token ? 'Log out' : 'Log in'}
+            onPress={() => token ? setProfileMenuVisible(true) : navigation.navigate('Auth')}
+            style={[styles.iconButton, { padding: 4 }]}
+            accessibilityLabel={token ? 'Profile' : 'Log in'}
           >
-            <Ionicons name={token ? 'log-out-outline' : 'person-outline'} size={22} color={colors.text} />
+            {renderAvatar()}
           </TouchableOpacity>
         </View>
       </View>
@@ -244,51 +294,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       {/* ─── Expandable FAB ──────────────────────── */}
       <View style={styles.fabContainer}>
         {/* Link Button */}
-        <Animated.View style={[styles.subFabContainer, {
-          transform: [
-            { scale: fabAnim },
-            { translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -195] }) },
-          ],
-        }]}>
-          <TouchableOpacity
-            style={[styles.subFab, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => { closeFab(); Toast.show({ position: 'bottom', type: 'info', text1: 'Coming soon!' }); }}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="link-outline" size={22} color={colors.text} />
-          </TouchableOpacity>
+        <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -195] }) }, { scale: fabAnim }] }]}>
+            <TouchableOpacity onPress={() => { closeFab(); Toast.show({ position: 'bottom', type: 'info', text1: 'Coming soon!' }); }} activeOpacity={0.85}>
+              <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
+                <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
+                  From Link
+                </Animated.Text>
+                <Ionicons name="link-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
+              </Animated.View>
+            </TouchableOpacity>
         </Animated.View>
 
         {/* Import Button */}
-        <Animated.View style={[styles.subFabContainer, {
-          transform: [
-            { scale: fabAnim },
-            { translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -130] }) },
-          ],
-        }]}>
-          <TouchableOpacity
-            style={[styles.subFab, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => { closeFab(); importFile(); }}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="cloud-upload-outline" size={22} color={colors.text} />
-          </TouchableOpacity>
+        <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -130] }) }, { scale: fabAnim }] }]}>
+            <TouchableOpacity onPress={() => { closeFab(); importFile(); }} activeOpacity={0.85}>
+              <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
+                <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
+                  Import File
+                </Animated.Text>
+                <Ionicons name="cloud-upload-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
+              </Animated.View>
+            </TouchableOpacity>
         </Animated.View>
 
         {/* New Button */}
-        <Animated.View style={[styles.subFabContainer, {
-          transform: [
-            { scale: fabAnim },
-            { translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -65] }) },
-          ],
-        }]}>
-          <TouchableOpacity
-            style={[styles.subFab, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => { closeFab(); navigation.navigate('Editor', { isNew: true }); }}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="document-text-outline" size={22} color={colors.text} />
-          </TouchableOpacity>
+        <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -65] }) }, { scale: fabAnim }] }]}>
+            <TouchableOpacity onPress={() => { closeFab(); navigation.navigate('Editor', { isNew: true }); }} activeOpacity={0.85}>
+              <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
+                <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
+                  New File
+                </Animated.Text>
+                <Ionicons name="document-text-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
+              </Animated.View>
+            </TouchableOpacity>
         </Animated.View>
 
         {/* Main FAB */}
@@ -305,6 +343,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </Animated.View>
         </TouchableOpacity>
       </View>
+
+      {/* ─── Modals ──────────────────────── */}
+      <Modal visible={profileMenuVisible} transparent animationType="fade">
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setProfileMenuVisible(false)}>
+          <View style={[styles.profileMenu, { backgroundColor: colors.card, borderColor: colors.border, shadowColor: isDark ? 'transparent' : colors.shadow }]}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); Toast.show({ position: 'bottom', type: 'info', text1: 'Coming soon!' }); }}>
+              <Ionicons name="person-outline" size={20} color={colors.text} />
+              <ThemedText style={styles.menuText}>Profile</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); Toast.show({ position: 'bottom', type: 'info', text1: 'Coming soon!' }); }}>
+              <Ionicons name="settings-outline" size={20} color={colors.text} />
+              <ThemedText style={styles.menuText}>Settings</ThemedText>
+            </TouchableOpacity>
+            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); setLogoutConfirmVisible(true); }}>
+              <Ionicons name="log-out-outline" size={20} color={colors.error} />
+              <ThemedText style={[styles.menuText, { color: colors.error }]}>Log Out</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <ConfirmModal
+        visible={deleteConfirmVisible}
+        title="Delete File"
+        message={`Are you sure you want to delete "${fileToDelete?.name}"?`}
+        onCancel={() => { setDeleteConfirmVisible(false); setFileToDelete(null); }}
+        onConfirm={executeDelete}
+        confirmText="Delete"
+      />
+
+      <ConfirmModal
+        visible={logoutConfirmVisible}
+        title="Log Out"
+        message="Are you sure you want to log out?"
+        onCancel={() => setLogoutConfirmVisible(false)}
+        onConfirm={handleLogout}
+        confirmText="Log Out"
+      />
     </SafeAreaView>
   );
 };
@@ -339,6 +416,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     backgroundColor: 'transparent',
   },
+  subFabPill: {
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  subFabPillText: {
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 14,
+    position: 'absolute',
+    right: 48,
+  },
+  fileDetails: { flex: 1 },
+  fileActions: { flexDirection: 'row', alignItems: 'center' },
+  deleteButton: { padding: 4 },
   fileCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -354,9 +449,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fileDetails: { flex: 1 },
-  fileActions: { flexDirection: 'row', alignItems: 'center' },
-  deleteButton: { padding: 4 },
   emptyState: {
     flex: 1,
     alignItems: 'center',
@@ -379,18 +471,25 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
   },
-  subFabContainer: {
+  subFabRow: {
     position: 'absolute',
-    width: 48,
-    height: 48,
+    right: 6,
+    alignItems: 'flex-end',
   },
-  subFab: {
-    width: 48,
+  subFabPill: {
     height: 48,
     borderRadius: 24,
     borderWidth: 2,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  subFabPillText: {
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 14,
+    position: 'absolute',
+    right: 48,
   },
   fabShadow: {
     position: 'absolute',
@@ -412,5 +511,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 0,
+  },
+  avatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  profileMenu: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    width: 200,
+    borderWidth: 2,
+    borderRadius: 0,
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    paddingVertical: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  menuText: {
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 15,
+  },
+  menuDivider: {
+    height: 2,
+    marginVertical: 4,
   },
 });
