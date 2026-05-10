@@ -11,7 +11,7 @@ describe('Theme constants', () => {
     });
 
     it('has yellow primary accent', () => {
-      expect(lightTheme.primary).toBe('#FFE500');
+      expect(lightTheme.primary).toBe('#FACC15');
     });
 
     it('has teal accent color', () => {
@@ -37,7 +37,7 @@ describe('Theme constants', () => {
 
   describe('darkTheme', () => {
     it('has dark background', () => {
-      expect(darkTheme.background).toBe('#0F0F0F');
+      expect(darkTheme.background).toBe('#1C1C1C');
     });
 
     it('has cream text for readability on dark', () => {
@@ -45,7 +45,7 @@ describe('Theme constants', () => {
     });
 
     it('keeps same yellow primary accent', () => {
-      expect(darkTheme.primary).toBe('#FFE500');
+      expect(darkTheme.primary).toBe('#FACC15');
     });
 
     it('has cream border color for dark mode', () => {
@@ -53,11 +53,11 @@ describe('Theme constants', () => {
     });
 
     it('has dark card background', () => {
-      expect(darkTheme.card).toBe('#222222');
+      expect(darkTheme.card).toBe('#2C2C2C');
     });
 
-    it('has yellow shadow for dark mode', () => {
-      expect(darkTheme.shadow).toBe('#FFE500');
+    it('has transparent shadow for dark mode', () => {
+      expect(darkTheme.shadow).toBe('transparent');
     });
 
     it('has dark error color', () => {

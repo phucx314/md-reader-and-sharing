@@ -132,7 +132,7 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
       ]}
       onPress={() => setExpiryHours(value)}
     >
-      <ThemedText type="label" style={{ color: '#111', fontWeight: expiryHours === value ? '700' : '400' }}>
+      <ThemedText type="label" style={{ color: expiryHours === value ? '#111' : colors.text, fontWeight: expiryHours === value ? '700' : '400' }}>
         {label}
       </ThemedText>
     </TouchableOpacity>

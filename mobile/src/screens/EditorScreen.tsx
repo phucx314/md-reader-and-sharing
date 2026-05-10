@@ -92,6 +92,8 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
     fence: { backgroundColor: isDark ? '#2A2A2A' : '#E8F4F8', color: isDark ? '#E5E5E5' : '#111111', borderColor: colors.border, borderWidth: 2, borderRadius: 0, padding: 16 },
     blockquote: { borderLeftWidth: 4, borderLeftColor: colors.primary, paddingLeft: 16, backgroundColor: colors.primary + (isDark ? '22' : '33') },
     strong: { fontFamily: 'SpaceGrotesk-Bold' },
+    code_inline: { backgroundColor: isDark ? '#333' : '#FACC15', color: isDark ? '#FFF' : '#111', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
+    s: { textDecorationLine: 'line-through' },
   };
 
   return (
@@ -129,15 +131,15 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
             style={[styles.toggleOption, !isPreview && { backgroundColor: colors.primary }]}
             onPress={() => setIsPreview(false)}
           >
-            <Ionicons name="create-outline" size={14} color="#111" style={{ marginRight: 4 }} />
-            <ThemedText type="caption" style={{ color: '#111', fontFamily: 'SpaceGrotesk-Bold' }}>Edit</ThemedText>
+            <Ionicons name="create-outline" size={14} color={!isPreview ? '#111' : colors.text} style={{ marginRight: 4 }} />
+            <ThemedText type="caption" style={{ color: !isPreview ? '#111' : colors.text, fontFamily: 'SpaceGrotesk-Bold' }}>Edit</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggleOption, isPreview && { backgroundColor: colors.primary }]}
             onPress={() => { handleSave(); setIsPreview(true); }}
           >
-            <Ionicons name="eye-outline" size={14} color="#111" style={{ marginRight: 4 }} />
-            <ThemedText type="caption" style={{ color: '#111', fontFamily: 'SpaceGrotesk-Bold' }}>Preview</ThemedText>
+            <Ionicons name="eye-outline" size={14} color={isPreview ? '#111' : colors.text} style={{ marginRight: 4 }} />
+            <ThemedText type="caption" style={{ color: isPreview ? '#111' : colors.text, fontFamily: 'SpaceGrotesk-Bold' }}>Preview</ThemedText>
           </TouchableOpacity>
         </View>
 

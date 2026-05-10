@@ -91,13 +91,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
               style={[styles.tabItem, isLogin && { backgroundColor: colors.primary }]}
               onPress={() => setIsLogin(true)}
             >
-              <ThemedText type="label" style={{ color: '#111' }}>Log In</ThemedText>
+              <ThemedText type="label" style={{ color: isLogin ? '#111' : colors.text }}>Log In</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tabItem, !isLogin && { backgroundColor: colors.primary }]}
               onPress={() => setIsLogin(false)}
             >
-              <ThemedText type="label" style={{ color: '#111' }}>Sign Up</ThemedText>
+              <ThemedText type="label" style={{ color: !isLogin ? '#111' : colors.text }}>Sign Up</ThemedText>
             </TouchableOpacity>
           </View>
 

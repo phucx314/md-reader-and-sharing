@@ -225,11 +225,12 @@ const styles = StyleSheet.create({
   },
   fabShadow: {
     position: 'absolute',
-    top: 4,
-    left: 4,
-    right: -4,
-    bottom: -4,
+    top: 0,
+    left: 0,
+    width: 60,
+    height: 60,
     borderRadius: 30,
+    transform: [{ translateX: 4 }, { translateY: 4 }],
   },
   fab: {
     position: 'absolute',
