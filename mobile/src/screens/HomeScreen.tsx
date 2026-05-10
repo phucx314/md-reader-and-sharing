@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
-  headerActions: { flexDirection: 'row' },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
   iconButton: { marginLeft: 8, padding: 6 },
   list: { padding: 16, paddingBottom: 100 },
   listEmpty: { flex: 1 },

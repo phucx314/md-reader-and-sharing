@@ -197,7 +197,9 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
             <ThemedText type="subtitle" style={styles.sectionLabel}>My Links</ThemedText>
           </View>
         }
-        data={[...myLinks].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())}
+        data={[...myLinks]
+          .filter(link => !filename || link.original_filename === filename)
+          .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())}
         keyExtractor={(item) => item.token}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
@@ -215,17 +217,32 @@ export const ShareScreen: React.FC<ShareScreenProps> = ({ navigation, route }) =
                 <ThemedText type="label" numberOfLines={1} style={{ flex: 1 }}>
                   {item.original_filename}
                 </ThemedText>
-                {/* Status badge */}
-                <View style={[
-                  styles.statusBadge,
-                  {
-                    backgroundColor: expired ? colors.error : colors.success,
-                    borderColor: colors.border,
-                  },
-                ]}>
-                  <ThemedText type="caption" style={{ color: '#fff', fontFamily: 'SpaceGrotesk-Bold' }}>
-                    {expired ? 'EXPIRED' : 'ACTIVE'}
-                  </ThemedText>
+                {/* Status badges */}
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {item.is_anonymous && (
+                    <View style={[
+                      styles.statusBadge,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                      },
+                    ]}>
+                      <ThemedText type="caption" style={{ color: colors.text, fontFamily: 'SpaceGrotesk-Bold' }}>
+                        ANON
+                      </ThemedText>
+                    </View>
+                  )}
+                  <View style={[
+                    styles.statusBadge,
+                    {
+                      backgroundColor: expired ? colors.error : colors.success,
+                      borderColor: colors.border,
+                    },
+                  ]}>
+                    <ThemedText type="caption" style={{ color: '#fff', fontFamily: 'SpaceGrotesk-Bold' }}>
+                      {expired ? 'EXPIRED' : 'ACTIVE'}
+                    </ThemedText>
+                  </View>
                 </View>
               </View>
 
