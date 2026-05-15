@@ -210,7 +210,7 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
 
         const newTargetUri = `${DIR_URI}${finalFilename}`;
         
-        if (targetUri && uri !== newTargetUri) {
+        if (uri && uri !== newTargetUri) {
           try {
             await FileSystem.moveAsync({ from: uri, to: newTargetUri });
           } catch (err) {
@@ -225,20 +225,20 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
         }
       }
 
-      await FileSystem.writeAsStringAsync(targetUri, content);
+      await FileSystem.writeAsStringAsync(targetUri!, content);
       
       if (currentFileId) {
         await saveFile({
           id: currentFileId,
           filename: finalFilename,
-          uri: targetUri,
+          uri: targetUri!,
           createdAt: Date.now()
         });
       }
       
-      setUri(targetUri);
+      setUri(targetUri!);
       setIsDirty(false);
-      const info = await FileSystem.getInfoAsync(targetUri);
+      const info = await FileSystem.getInfoAsync(targetUri!);
       if (info.exists) {
         setLastModified((info as any).modificationTime ?? 0);
       }
