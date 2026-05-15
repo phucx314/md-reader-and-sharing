@@ -21,12 +21,14 @@ import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { MermaidGraph } from '../components/MermaidGraph';
+import { TablePreview } from '../components/TablePreview';
 import { saveFile, generateUUID } from '../utils/fileStore';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useRef } from 'react';
+import { splitMarkdownWithTables } from '../utils/markdownTables';
 
 type EditorScreenProps = {
   navigation: StackNavigationProp<any, any>;
@@ -300,6 +302,7 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
       );
     },
   };
+  const previewBlocks = splitMarkdownWithTables(content || '*Nothing to preview yet…*');
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -375,9 +378,25 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         {isPreview ? (
           <ScrollView style={[styles.previewScroll, { backgroundColor: isDark ? colors.background : '#FFFEF2' }]} contentContainerStyle={styles.previewContent}>
-            <Markdown style={markdownStyles as any} rules={markdownRules}>
-              {content || '*Nothing to preview yet…*'}
-            </Markdown>
+            {previewBlocks.map((block, index) => {
+              if (block.type === 'table' && block.columns > 4) {
+                return (
+                  <TablePreview
+                    key={`table-${index}`}
+                    tableMarkdown={block.content}
+                    columns={block.columns}
+                    colors={colors}
+                    isDark={isDark}
+                  />
+                );
+              }
+
+              return (
+                <Markdown key={`md-${index}`} style={markdownStyles as any} rules={markdownRules}>
+                  {block.type === 'table' ? `${block.content}\n` : block.content}
+                </Markdown>
+              );
+            })}
           </ScrollView>
         ) : (
           <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ flexGrow: 1 }}>
