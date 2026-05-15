@@ -76,6 +76,14 @@ app.include_router(view.router)
 def read_root():
     return {"message": "Welcome to MD Reader & Sharing API"}
 
+@app.get("/api/wakeup")
+def wakeup():
+    return {
+        "ok": True,
+        "message": "awake",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
