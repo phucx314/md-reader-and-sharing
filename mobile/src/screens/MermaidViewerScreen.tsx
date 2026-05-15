@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,10 +21,7 @@ export const MermaidViewerScreen: React.FC<MermaidViewerProps> = ({ navigation, 
   const { chart = '' } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [isLandscapeLocked, setIsLandscapeLocked] = useState(false);
-  const webViewRef = useRef<WebView>(null);
   const html = useMemo(() => buildMermaidHtml(String(chart), isDark, true), [chart, isDark]);
-
-  const runZoom = (script: string) => `${script}; true;`;
 
   useEffect(() => {
     let active = true;
@@ -60,39 +57,22 @@ export const MermaidViewerScreen: React.FC<MermaidViewerProps> = ({ navigation, 
           <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
         <ThemedText style={styles.title} numberOfLines={1}>Mermaid Graph</ThemedText>
-        <View style={styles.zoomControls}>
-          <TouchableOpacity
-            style={[styles.zoomButton, { borderColor: colors.border }]}
-            onPress={() => webViewRef.current?.injectJavaScript(runZoom('window.zoomOut()'))}
-            accessibilityLabel="Zoom out"
-          >
-            <Ionicons name="remove" size={22} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.zoomButton, { borderColor: colors.border }]}
-            onPress={toggleOrientation}
-            accessibilityLabel="Toggle screen orientation"
-          >
-            <Ionicons name={isLandscapeLocked ? 'phone-portrait-outline' : 'phone-landscape-outline'} size={19} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.zoomButton, { borderColor: colors.border }]}
-            onPress={() => webViewRef.current?.injectJavaScript(runZoom('window.zoomIn()'))}
-            accessibilityLabel="Zoom in"
-          >
-            <Ionicons name="add" size={22} color={colors.text} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.zoomButton, { borderColor: colors.border }]}
+          onPress={toggleOrientation}
+          accessibilityLabel="Toggle screen orientation"
+        >
+          <Ionicons name={isLandscapeLocked ? 'phone-portrait-outline' : 'phone-landscape-outline'} size={19} color={colors.text} />
+        </TouchableOpacity>
       </View>
 
       <View style={[styles.viewerFrame, { borderColor: colors.border }]}>
         <WebView
-          ref={webViewRef}
           originWhitelist={['*']}
           source={{ html }}
           style={styles.webView}
-          scalesPageToFit={false}
-          setBuiltInZoomControls={false}
+          scalesPageToFit
+          setBuiltInZoomControls
           setDisplayZoomControls={false}
           onMessage={() => setLoading(false)}
           onLoadEnd={() => setLoading(false)}
@@ -129,11 +109,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 16,
-  },
-  zoomControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
   },
   zoomButton: {
     alignItems: 'center',
