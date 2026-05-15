@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+SQLAlchemy
+python-dotenv
+PyJWT
+bcrypt
+python-multipart
+email-validator
+markdown
+aiofiles
