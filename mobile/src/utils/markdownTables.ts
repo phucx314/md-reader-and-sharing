@@ -78,6 +78,8 @@ export const markdownTableToHtml = (tableMarkdown: string, isDark: boolean): str
   const card = isDark ? '#2C2C2C' : '#FFFFFF';
   const text = isDark ? '#F5F0E8' : '#111111';
   const border = isDark ? '#F5F0E8' : '#111111';
+  const headerBg = '#FACC15';
+  const headerText = '#111111';
 
   const headerHtml = header.map((cell) => `<th>${escapeHtml(cell)}</th>`).join('');
   const rowsHtml = bodyRows
@@ -113,7 +115,8 @@ export const markdownTableToHtml = (tableMarkdown: string, isDark: boolean): str
         position: sticky;
         top: 0;
         z-index: 2;
-        background: ${card};
+        background: ${headerBg};
+        color: ${headerText};
       }
       th, td {
         border: 2px solid ${border};
@@ -122,6 +125,10 @@ export const markdownTableToHtml = (tableMarkdown: string, isDark: boolean): str
         text-align: left;
         font-size: 14px;
         line-height: 18px;
+        color: ${text};
+      }
+      th {
+        font-weight: 700;
       }
       tbody tr:nth-child(odd) td {
         background: ${isDark ? '#252525' : '#FAFAF4'};
