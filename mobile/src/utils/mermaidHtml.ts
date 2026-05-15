@@ -166,15 +166,10 @@ export const buildMermaidHtml = (chart: string, isDark: boolean, fullScreen: boo
               baseHeight = rect.height || 1;
             }
             svgRef = svg;
-            if (isFullScreen) {
-              const horizontalPadding = 36;
-              const availableWidth = Math.max(1, window.innerWidth - horizontalPadding);
-              zoom = Math.min(1, availableWidth / baseWidth);
-              minZoom = zoom;
-            } else {
-              zoom = 1;
-              minZoom = 0.25;
-            }
+            const horizontalPadding = isFullScreen ? 36 : 20;
+            const availableWidth = Math.max(1, window.innerWidth - horizontalPadding);
+            zoom = Math.min(1, availableWidth / baseWidth);
+            minZoom = isFullScreen ? zoom : 0.25;
             applyZoom();
             if (isFullScreen) {
               document.addEventListener('touchstart', handleTouchStart, { passive: true });
