@@ -270,6 +270,19 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
     navigation.navigate('Share', { uri: savedUri, filename: `${filename}.md`, fileId });
   };
 
+  const handleExplain = () => {
+    if (!token) {
+      Toast.show({ position: 'bottom', type: 'info', text1: 'Please log in to use Explain' });
+      navigation.navigate('Auth');
+      return;
+    }
+    navigation.navigate('ExplainViewer', {
+      content,
+      filename: `${filename}.md`,
+      fileId,
+    });
+  };
+
   const markdownStyles = {
     body: { color: colors.text, fontFamily: 'SpaceGrotesk-Regular', fontSize: 16, lineHeight: 26, backgroundColor: isDark ? colors.background : '#FFFEF2' },
     heading1: { color: colors.text, fontFamily: 'SpaceGrotesk-Bold', fontSize: 28, borderBottomWidth: 2, borderBottomColor: colors.border, paddingBottom: 8, marginBottom: 16, marginTop: 24 },
@@ -340,6 +353,11 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
           <TouchableOpacity onPress={handleShare} style={styles.headerBtn} accessibilityLabel="Share">
             <Ionicons name="share-social-outline" size={22} color={colors.text} />
           </TouchableOpacity>
+          {isPreview && (
+            <TouchableOpacity onPress={handleExplain} style={styles.headerBtn} accessibilityLabel="Explain selected text">
+              <Ionicons name="sparkles-outline" size={22} color={colors.text} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

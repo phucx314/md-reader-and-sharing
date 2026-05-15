@@ -8,12 +8,13 @@ from sqlmodel import SQLModel
 
 # Import models so they are registered with SQLModel metadata before creating tables
 
-from app.routers import auth, share, view
+from app.routers import auth, explain, share, view
 import asyncio
 import os
 from datetime import datetime, timezone, timedelta
 from sqlmodel import Session, select
 from app.models.share import ShareLink
+from app.models.explanation import ExplanationCache, ExplainUsage  # noqa: F401
 
 async def cleanup_expired_links():
     while True:
@@ -67,6 +68,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(share.router)
+app.include_router(explain.router)
 app.include_router(view.router)
 
 
