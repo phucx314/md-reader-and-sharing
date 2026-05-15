@@ -7,7 +7,7 @@ export const buildMermaidHtml = (chart: string, isDark: boolean, fullScreen: boo
   return `<!doctype html>
 <html>
   <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=8, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <style>
       html, body {
         margin: 0;
@@ -67,13 +67,10 @@ export const buildMermaidHtml = (chart: string, isDark: boolean, fullScreen: boo
         svgRef.style.height = (baseHeight * zoom) + 'px';
       }
 
-      function zoomAtViewportCenter(factor) {
+      function setZoom(nextZoom, centerX, centerY) {
         const prevZoom = zoom;
-        zoom = Math.max(minZoom, Math.min(prevZoom * factor, 6));
+        zoom = Math.max(minZoom, Math.min(nextZoom, 6));
         if (zoom === prevZoom) return;
-
-        const centerX = window.scrollX + (window.innerWidth / 2);
-        const centerY = window.scrollY + (window.innerHeight / 2);
 
         const logicalX = centerX / prevZoom;
         const logicalY = centerY / prevZoom;
@@ -84,6 +81,52 @@ export const buildMermaidHtml = (chart: string, isDark: boolean, fullScreen: boo
         const nextScrollX = Math.max(0, nextCenterX - window.innerWidth / 2);
         const nextScrollY = Math.max(0, nextCenterY - window.innerHeight / 2);
         window.scrollTo(nextScrollX, nextScrollY);
+      }
+
+      function zoomAtViewportCenter(factor) {
+        const centerX = window.scrollX + (window.innerWidth / 2);
+        const centerY = window.scrollY + (window.innerHeight / 2);
+        setZoom(zoom * factor, centerX, centerY);
+      }
+
+      let pinchStartDistance = 0;
+      let pinchStartZoom = 1;
+      let pinchCenterLogicalX = 0;
+      let pinchCenterLogicalY = 0;
+
+      function touchDistance(t1, t2) {
+        const dx = t1.clientX - t2.clientX;
+        const dy = t1.clientY - t2.clientY;
+        return Math.sqrt((dx * dx) + (dy * dy));
+      }
+
+      function handleTouchStart(event) {
+        if (!isFullScreen || event.touches.length !== 2) return;
+        pinchStartDistance = touchDistance(event.touches[0], event.touches[1]);
+        pinchStartZoom = zoom;
+        const centerClientX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+        const centerClientY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+        const centerX = window.scrollX + centerClientX;
+        const centerY = window.scrollY + centerClientY;
+        pinchCenterLogicalX = centerX / zoom;
+        pinchCenterLogicalY = centerY / zoom;
+      }
+
+      function handleTouchMove(event) {
+        if (!isFullScreen || event.touches.length !== 2 || !pinchStartDistance) return;
+        event.preventDefault();
+        const distance = touchDistance(event.touches[0], event.touches[1]);
+        const factor = distance / pinchStartDistance;
+        const nextZoom = pinchStartZoom * factor;
+        const centerX = pinchCenterLogicalX * zoom;
+        const centerY = pinchCenterLogicalY * zoom;
+        setZoom(nextZoom, centerX, centerY);
+      }
+
+      function handleTouchEnd(event) {
+        if (event.touches.length < 2) {
+          pinchStartDistance = 0;
+        }
       }
 
       window.zoomIn = function() {
@@ -133,6 +176,12 @@ export const buildMermaidHtml = (chart: string, isDark: boolean, fullScreen: boo
               minZoom = 0.25;
             }
             applyZoom();
+            if (isFullScreen) {
+              document.addEventListener('touchstart', handleTouchStart, { passive: true });
+              document.addEventListener('touchmove', handleTouchMove, { passive: false });
+              document.addEventListener('touchend', handleTouchEnd, { passive: true });
+              document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+            }
           }
           post({ type: 'rendered' });
         } catch (error) {

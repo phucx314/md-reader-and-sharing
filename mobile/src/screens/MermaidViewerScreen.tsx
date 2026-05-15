@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp } from '@react-navigation/native';
@@ -91,8 +91,8 @@ export const MermaidViewerScreen: React.FC<MermaidViewerProps> = ({ navigation, 
           originWhitelist={['*']}
           source={{ html }}
           style={styles.webView}
-          scalesPageToFit={Platform.OS === 'android'}
-          setBuiltInZoomControls
+          scalesPageToFit={false}
+          setBuiltInZoomControls={false}
           setDisplayZoomControls={false}
           onMessage={() => setLoading(false)}
           onLoadEnd={() => setLoading(false)}
