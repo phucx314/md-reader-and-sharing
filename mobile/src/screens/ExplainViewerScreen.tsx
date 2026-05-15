@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -50,25 +49,158 @@ const escapeHtml = (str: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+const renderInlineMarkdown = (line: string) => {
+  let html = escapeHtml(line);
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  return html;
+};
+
+const renderMarkdownToHtml = (markdown: string) => {
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+  const html: string[] = [];
+  let inCode = false;
+  let inUl = false;
+  let inOl = false;
+  let inTable = false;
+  let tableRows: string[][] = [];
+
+  const closeLists = () => {
+    if (inUl) {
+      html.push('</ul>');
+      inUl = false;
+    }
+    if (inOl) {
+      html.push('</ol>');
+      inOl = false;
+    }
+  };
+
+  const flushTable = () => {
+    if (!inTable || tableRows.length === 0) return;
+    const [header, ...body] = tableRows;
+    html.push('<div class="table-wrap" data-context="1"><table><thead><tr>');
+    header.forEach((cell) => html.push(`<th>${renderInlineMarkdown(cell.trim())}</th>`));
+    html.push('</tr></thead><tbody>');
+    body.forEach((row) => {
+      html.push('<tr>');
+      row.forEach((cell) => html.push(`<td>${renderInlineMarkdown(cell.trim())}</td>`));
+      html.push('</tr>');
+    });
+    html.push('</tbody></table></div>');
+    inTable = false;
+    tableRows = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine;
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('```')) {
+      closeLists();
+      flushTable();
+      if (!inCode) {
+        inCode = true;
+        html.push('<pre data-context="1"><code>');
+      } else {
+        inCode = false;
+        html.push('</code></pre>');
+      }
+      continue;
+    }
+
+    if (inCode) {
+      html.push(`${escapeHtml(line)}\n`);
+      continue;
+    }
+
+    if (trimmed === '') {
+      closeLists();
+      flushTable();
+      continue;
+    }
+
+    const tableMatch = line.includes('|');
+    if (tableMatch) {
+      const cells = line
+        .split('|')
+        .map((v) => v.trim())
+        .filter((v, idx, arr) => !(idx === 0 && v === '') && !(idx === arr.length - 1 && v === ''));
+      if (cells.length >= 2) {
+        if (cells.every((cell) => /^:?-{2,}:?$/.test(cell))) {
+          continue;
+        }
+        closeLists();
+        inTable = true;
+        tableRows.push(cells);
+        continue;
+      }
+    }
+    flushTable();
+
+    const heading = line.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      closeLists();
+      const level = Math.min(3, heading[1].length);
+      html.push(`<h${level} data-context="1">${renderInlineMarkdown(heading[2])}</h${level}>`);
+      continue;
+    }
+
+    if (/^>\s+/.test(trimmed)) {
+      closeLists();
+      html.push(`<blockquote data-context="1">${renderInlineMarkdown(trimmed.replace(/^>\s+/, ''))}</blockquote>`);
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(trimmed)) {
+      if (inOl) {
+        html.push('</ol>');
+        inOl = false;
+      }
+      if (!inUl) {
+        html.push('<ul data-context="1">');
+        inUl = true;
+      }
+      html.push(`<li>${renderInlineMarkdown(trimmed.replace(/^[-*]\s+/, ''))}</li>`);
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(trimmed)) {
+      if (inUl) {
+        html.push('</ul>');
+        inUl = false;
+      }
+      if (!inOl) {
+        html.push('<ol data-context="1">');
+        inOl = true;
+      }
+      html.push(`<li>${renderInlineMarkdown(trimmed.replace(/^\d+\.\s+/, ''))}</li>`);
+      continue;
+    }
+
+    if (/^---+$/.test(trimmed)) {
+      closeLists();
+      html.push('<hr data-context="1" />');
+      continue;
+    }
+
+    closeLists();
+    html.push(`<p data-context="1">${renderInlineMarkdown(line)}</p>`);
+  }
+
+  closeLists();
+  flushTable();
+  if (inCode) html.push('</code></pre>');
+  return html.join('\n');
+};
+
 const buildExplainHtml = (markdown: string, isDark: boolean) => {
-  const blocks = markdown
-    .split(/\n\s*\n/g)
-    .map((block) => block.trim())
-    .filter(Boolean);
   const bg = isDark ? '#1C1C1C' : '#FFFEF2';
   const text = isDark ? '#F5F0E8' : '#111111';
   const muted = isDark ? '#999999' : '#666666';
-  const htmlBlocks = blocks
-    .map((block, idx) => {
-      const escaped = escapeHtml(block);
-      if (/^#{1,6}\s/.test(block)) {
-        const level = Math.min(3, block.match(/^#+/)?.[0].length || 2);
-        const content = escaped.replace(/^#{1,6}\s*/, '');
-        return `<h${level} data-block-index="${idx}" data-context="1">${content}</h${level}>`;
-      }
-      return `<p data-block-index="${idx}" data-context="1">${escaped.replace(/\n/g, '<br>')}</p>`;
-    })
-    .join('\n');
+  const htmlBlocks = renderMarkdownToHtml(markdown);
 
   return `<!doctype html>
 <html>
@@ -87,16 +219,54 @@ const buildExplainHtml = (markdown: string, isDark: boolean) => {
         user-select: text;
       }
       body { padding: 20px; }
-      p { margin: 8px 0; white-space: normal; }
+      p { margin: 10px 0; white-space: normal; }
       h1, h2, h3 { margin: 18px 0 10px; line-height: 1.25; }
-      code, pre { font-family: monospace; }
+      a { color: ${isDark ? '#FACC15' : '#B45309'}; text-decoration: none; }
+      blockquote {
+        margin: 12px 0;
+        padding-left: 10px;
+        border-left: 3px solid ${isDark ? '#5A5A5A' : '#D4D4D4'};
+        color: ${isDark ? '#CFCFCF' : '#4B5563'};
+      }
+      ul, ol { margin: 10px 0 10px 22px; padding: 0; }
+      li { margin: 6px 0; }
+      hr { border: none; border-top: 1px solid ${isDark ? '#404040' : '#E5E5E5'}; margin: 16px 0; }
+      code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      code {
+        background: ${isDark ? '#2A2A2A' : '#F1F1F1'};
+        padding: 1px 4px;
+        border-radius: 4px;
+      }
+      pre {
+        background: ${isDark ? '#242424' : '#F7F7F7'};
+        padding: 12px;
+        border-radius: 6px;
+        overflow: auto;
+        line-height: 1.45;
+      }
+      .table-wrap { overflow-x: auto; margin: 12px 0; }
+      table {
+        width: max-content;
+        min-width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      th, td {
+        text-align: left;
+        vertical-align: top;
+        padding: 8px 10px;
+        border-bottom: 1px solid ${isDark ? '#3A3A3A' : '#E5E7EB'};
+      }
+      thead th {
+        border-bottom: 2px solid ${isDark ? '#4A4A4A' : '#D1D5DB'};
+      }
       .hint { color: ${muted}; font-size: 13px; margin-bottom: 16px; }
       ::selection { background: #FACC15; color: #111111; }
     </style>
   </head>
   <body>
     <div class="hint">Select a word or phrase, then tap Explain.</div>
-    <main id="content">${htmlBlocks || '<p data-block-index="0" data-context="1">Nothing to preview yet.</p>'}</main>
+    <main id="content">${htmlBlocks || '<p data-context="1">Nothing to preview yet.</p>'}</main>
     <script>
       const blocks = Array.from(document.querySelectorAll('[data-context="1"]'));
       let timer = null;
@@ -117,7 +287,7 @@ const buildExplainHtml = (markdown: string, isDark: boolean) => {
         }
         const range = sel.rangeCount ? sel.getRangeAt(0) : null;
         const block = range ? closestBlock(range.commonAncestorContainer) : null;
-        const idx = block ? Number(block.getAttribute('data-block-index')) : -1;
+        const idx = block ? blocks.indexOf(block) : -1;
         const paragraph = block ? block.innerText.trim() : document.body.innerText.trim();
         const before = idx > 0 && blocks[idx - 1] ? blocks[idx - 1].innerText.trim() : '';
         const after = idx >= 0 && blocks[idx + 1] ? blocks[idx + 1].innerText.trim() : '';
@@ -139,6 +309,7 @@ export const ExplainViewerScreen: React.FC<ExplainViewerProps> = ({ navigation, 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ExplainResult | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [privacyVisible, setPrivacyVisible] = useState(false);
   const html = useMemo(() => buildExplainHtml(String(content), isDark), [content, isDark]);
 
   React.useEffect(() => {
@@ -146,14 +317,19 @@ export const ExplainViewerScreen: React.FC<ExplainViewerProps> = ({ navigation, 
       const key = 'explainPrivacyNoticeSeen';
       const seen = await AsyncStorage.getItem(key);
       if (seen) return;
-      Alert.alert(
-        'Explain uses AI',
-        'Selected text and nearby context will be sent to the configured AI provider.',
-        [{ text: 'OK', onPress: () => AsyncStorage.setItem(key, 'true') }]
-      );
+      setPrivacyVisible(true);
     };
     showPrivacyNotice().catch(() => undefined);
   }, []);
+
+  const dismissPrivacyNotice = async () => {
+    setPrivacyVisible(false);
+    try {
+      await AsyncStorage.setItem('explainPrivacyNoticeSeen', 'true');
+    } catch {
+      // ignore storage errors
+    }
+  };
 
   const requestExplanation = async (renew = false) => {
     if (!selection?.selectedText) {
@@ -278,6 +454,23 @@ export const ExplainViewerScreen: React.FC<ExplainViewerProps> = ({ navigation, 
           </View>
         </View>
       </Modal>
+
+      <Modal visible={privacyVisible} transparent animationType="fade" onRequestClose={dismissPrivacyNotice}>
+        <View style={styles.modalOverlayCenter}>
+          <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ThemedText type="subtitle" style={styles.infoTitle}>Explain uses AI</ThemedText>
+            <ThemedText style={styles.infoText}>
+              Selected text and nearby context will be sent to the configured AI provider.
+            </ThemedText>
+            <TouchableOpacity
+              style={[styles.infoBtn, { backgroundColor: colors.primary, borderColor: colors.border }]}
+              onPress={dismissPrivacyNotice}
+            >
+              <ThemedText type="label" style={{ color: '#111111' }}>OK</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -331,6 +524,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
+  },
+  modalOverlayCenter: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  infoCard: {
+    borderWidth: 2,
+    padding: 16,
+    gap: 12,
+  },
+  infoTitle: {
+    fontFamily: 'SpaceGrotesk-Bold',
+  },
+  infoText: {
+    lineHeight: 22,
+  },
+  infoBtn: {
+    borderWidth: 2,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   resultCard: {
     borderTopWidth: 2,
