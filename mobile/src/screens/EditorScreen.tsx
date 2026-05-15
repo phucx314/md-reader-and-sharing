@@ -387,6 +387,7 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
                     columns={block.columns}
                     colors={colors}
                     isDark={isDark}
+                    markdownStyles={markdownStyles}
                   />
                 );
               }
