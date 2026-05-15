@@ -3,6 +3,7 @@ import {
   StyleSheet,
   View,
   TextInput,
+  Text,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -19,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { MermaidGraph } from '../components/MermaidGraph';
 import { saveFile, generateUUID } from '../utils/fileStore';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -282,6 +284,23 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
     hr: { marginVertical: 24, backgroundColor: colors.border, height: 2 },
   };
 
+  const markdownRules = {
+    fence: (node: any) => {
+      const language = String(node.sourceInfo || node.info || '').trim().split(/\s+/)[0].toLowerCase();
+      const code = String(node.content || '');
+
+      if (language === 'mermaid') {
+        return <MermaidGraph key={node.key} chart={code} colors={colors} isDark={isDark} />;
+      }
+
+      return (
+        <Text key={node.key} style={markdownStyles.fence as any}>
+          {code}
+        </Text>
+      );
+    },
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* ─── Header ──────────────────────────────── */}
@@ -356,7 +375,7 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         {isPreview ? (
           <ScrollView style={[styles.previewScroll, { backgroundColor: isDark ? colors.background : '#FFFEF2' }]} contentContainerStyle={styles.previewContent}>
-            <Markdown style={markdownStyles as any}>
+            <Markdown style={markdownStyles as any} rules={markdownRules}>
               {content || '*Nothing to preview yet…*'}
             </Markdown>
           </ScrollView>
