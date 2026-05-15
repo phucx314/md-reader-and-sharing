@@ -1,10 +1,11 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { WebView } from 'react-native-webview';
+import * as ScreenOrientation from 'expo-screen-orientation';
 
 import { ThemedText } from '../components/ThemedText';
 import { useTheme } from '../context/ThemeContext';
@@ -19,10 +20,38 @@ export const MermaidViewerScreen: React.FC<MermaidViewerProps> = ({ navigation, 
   const { colors, isDark } = useTheme();
   const { chart = '' } = route.params || {};
   const [loading, setLoading] = useState(true);
+  const [isLandscapeLocked, setIsLandscapeLocked] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const html = useMemo(() => buildMermaidHtml(String(chart), isDark, true), [chart, isDark]);
 
   const runZoom = (script: string) => `${script}; true;`;
+
+  useEffect(() => {
+    let active = true;
+    const syncOrientation = async () => {
+      const current = await ScreenOrientation.getOrientationAsync();
+      if (!active) return;
+      const landscape =
+        current === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+        current === ScreenOrientation.Orientation.LANDSCAPE_RIGHT;
+      setIsLandscapeLocked(landscape);
+    };
+    syncOrientation();
+    return () => {
+      active = false;
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => undefined);
+    };
+  }, []);
+
+  const toggleOrientation = async () => {
+    if (isLandscapeLocked) {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      setIsLandscapeLocked(false);
+      return;
+    }
+    await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    setIsLandscapeLocked(true);
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -41,10 +70,10 @@ export const MermaidViewerScreen: React.FC<MermaidViewerProps> = ({ navigation, 
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.zoomButton, { borderColor: colors.border }]}
-            onPress={() => webViewRef.current?.injectJavaScript(runZoom('window.fitGraph()'))}
-            accessibilityLabel="Fit graph"
+            onPress={toggleOrientation}
+            accessibilityLabel="Toggle screen orientation"
           >
-            <Ionicons name="scan-outline" size={20} color={colors.text} />
+            <Ionicons name={isLandscapeLocked ? 'phone-portrait-outline' : 'phone-landscape-outline'} size={19} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.zoomButton, { borderColor: colors.border }]}

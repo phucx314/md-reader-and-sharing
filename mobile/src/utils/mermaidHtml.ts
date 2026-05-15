@@ -21,19 +21,19 @@ export const buildMermaidHtml = (chart: string, isDark: boolean, fullScreen: boo
       }
       body {
         display: flex;
-        align-items: center;
-        justify-content: center;
+        align-items: ${fullScreen ? 'flex-start' : 'center'};
+        justify-content: ${fullScreen ? 'flex-start' : 'center'};
       }
       #graph {
         box-sizing: border-box;
-        width: ${fullScreen ? '100%' : 'auto'};
+        width: auto;
         padding: ${fullScreen ? '18px' : '10px'};
-        transform-origin: center center;
-        transition: transform 120ms ease;
+        min-width: ${fullScreen ? '100%' : '0'};
       }
       #graph svg {
         display: block;
-        width: 100%;
+        width: ${fullScreen ? 'auto' : '100%'};
+        max-width: ${fullScreen ? 'none' : '100%'};
         height: auto;
       }
       .error {
@@ -50,30 +50,48 @@ export const buildMermaidHtml = (chart: string, isDark: boolean, fullScreen: boo
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script>
       const source = ${encodedChart};
+      const isFullScreen = ${fullScreen ? 'true' : 'false'};
       let zoom = 1;
+      let minZoom = 0.25;
+      let baseWidth = 0;
+      let baseHeight = 0;
+      let svgRef = null;
 
       function post(payload) {
         window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(payload));
       }
 
       function applyZoom() {
-        document.getElementById('graph').style.transform = 'scale(' + zoom + ')';
+        if (!svgRef || !baseWidth || !baseHeight) return;
+        svgRef.style.width = (baseWidth * zoom) + 'px';
+        svgRef.style.height = (baseHeight * zoom) + 'px';
+      }
+
+      function zoomAtViewportCenter(factor) {
+        const prevZoom = zoom;
+        zoom = Math.max(minZoom, Math.min(prevZoom * factor, 6));
+        if (zoom === prevZoom) return;
+
+        const centerX = window.scrollX + (window.innerWidth / 2);
+        const centerY = window.scrollY + (window.innerHeight / 2);
+
+        const logicalX = centerX / prevZoom;
+        const logicalY = centerY / prevZoom;
+        applyZoom();
+
+        const nextCenterX = logicalX * zoom;
+        const nextCenterY = logicalY * zoom;
+        const nextScrollX = Math.max(0, nextCenterX - window.innerWidth / 2);
+        const nextScrollY = Math.max(0, nextCenterY - window.innerHeight / 2);
+        window.scrollTo(nextScrollX, nextScrollY);
       }
 
       window.zoomIn = function() {
-        zoom = Math.min(zoom * 1.2, 6);
-        applyZoom();
+        zoomAtViewportCenter(1.2);
       };
 
       window.zoomOut = function() {
-        zoom = Math.max(zoom / 1.2, 0.25);
-        applyZoom();
-      };
-
-      window.fitGraph = function() {
-        zoom = 1;
-        applyZoom();
-        window.scrollTo(0, 0);
+        zoomAtViewportCenter(1 / 1.2);
       };
 
       async function renderGraph() {
@@ -93,6 +111,28 @@ export const buildMermaidHtml = (chart: string, isDark: boolean, fullScreen: boo
           if (svg) {
             svg.removeAttribute('width');
             svg.removeAttribute('height');
+            const viewBox = (svg.getAttribute('viewBox') || '').trim().split(/\\s+/);
+            const vbWidth = Number(viewBox[2]);
+            const vbHeight = Number(viewBox[3]);
+            if (Number.isFinite(vbWidth) && vbWidth > 0 && Number.isFinite(vbHeight) && vbHeight > 0) {
+              baseWidth = vbWidth;
+              baseHeight = vbHeight;
+            } else {
+              const rect = svg.getBoundingClientRect();
+              baseWidth = rect.width || 1;
+              baseHeight = rect.height || 1;
+            }
+            svgRef = svg;
+            if (isFullScreen) {
+              const horizontalPadding = 36;
+              const availableWidth = Math.max(1, window.innerWidth - horizontalPadding);
+              zoom = Math.min(1, availableWidth / baseWidth);
+              minZoom = zoom;
+            } else {
+              zoom = 1;
+              minZoom = 0.25;
+            }
+            applyZoom();
           }
           post({ type: 'rendered' });
         } catch (error) {
