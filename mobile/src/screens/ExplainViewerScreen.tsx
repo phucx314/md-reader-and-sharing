@@ -379,11 +379,7 @@ export const ExplainViewerScreen: React.FC<ExplainViewerProps> = ({ navigation, 
           onPress={() => requestExplanation(false)}
           accessibilityLabel="Explain selected text"
         >
-          {loading ? (
-            <ActivityIndicator color="#111111" size="small" />
-          ) : (
-            <Ionicons name="sparkles-outline" size={18} color={selection?.selectedText ? '#111111' : colors.textMuted} />
-          )}
+          <Ionicons name="sparkles-outline" size={18} color={selection?.selectedText ? '#111111' : colors.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -413,9 +409,13 @@ export const ExplainViewerScreen: React.FC<ExplainViewerProps> = ({ navigation, 
             onPress={() => requestExplanation(false)}
             disabled={loading}
           >
-            <ThemedText type="caption" style={{ color: '#111111', fontFamily: 'SpaceGrotesk-Bold' }}>
-              Explain
-            </ThemedText>
+            {loading ? (
+              <ActivityIndicator color="#111111" size="small" />
+            ) : (
+              <ThemedText type="caption" style={{ color: '#111111', fontFamily: 'SpaceGrotesk-Bold' }}>
+                Explain
+              </ThemedText>
+            )}
           </TouchableOpacity>
         </View>
       ) : null}

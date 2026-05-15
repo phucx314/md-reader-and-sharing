@@ -338,12 +338,16 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
         />
 
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={handleUndo} disabled={historyIndex <= 0} style={styles.headerBtn} accessibilityLabel="Undo">
-            <Ionicons name="arrow-undo-outline" size={22} color={historyIndex <= 0 ? (isDark ? '#555' : '#ccc') : colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleRedo} disabled={historyIndex >= history.length - 1} style={styles.headerBtn} accessibilityLabel="Redo">
-            <Ionicons name="arrow-redo-outline" size={22} color={historyIndex >= history.length - 1 ? (isDark ? '#555' : '#ccc') : colors.text} />
-          </TouchableOpacity>
+          {!isPreview && (
+            <TouchableOpacity onPress={handleUndo} disabled={historyIndex <= 0} style={styles.headerBtn} accessibilityLabel="Undo">
+              <Ionicons name="arrow-undo-outline" size={22} color={historyIndex <= 0 ? (isDark ? '#555' : '#ccc') : colors.text} />
+            </TouchableOpacity>
+          )}
+          {!isPreview && (
+            <TouchableOpacity onPress={handleRedo} disabled={historyIndex >= history.length - 1} style={styles.headerBtn} accessibilityLabel="Redo">
+              <Ionicons name="arrow-redo-outline" size={22} color={historyIndex >= history.length - 1 ? (isDark ? '#555' : '#ccc') : colors.text} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => handleSave(false)} style={styles.headerBtn} accessibilityLabel="Save">
             <Ionicons name="save-outline" size={22} color={colors.text} />
             {isDirty && (

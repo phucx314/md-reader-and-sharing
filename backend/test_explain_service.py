@@ -100,6 +100,24 @@ class ExplainServiceTest(unittest.TestCase):
         cache = self.session.exec(select(ExplanationCache)).first()
         self.assertEqual(cache.meaning, "meaning-2")
 
+    def test_same_term_same_file_different_context_uses_file_term_cache(self):
+        provider = FakeProvider()
+        explain_term(session=self.session, current_user=self.user, req=self.request(), provider=provider, limit=20)
+
+        req2 = self.request()
+        req2.context_before = "Different section above."
+        req2.paragraph = "Another paragraph mentions event loop details."
+        req2.context_after = "Different section below."
+        req2.document_title = "async.md"
+
+        second_provider = FakeProvider()
+        result = explain_term(session=self.session, current_user=self.user, req=req2, provider=second_provider, limit=20)
+
+        self.assertTrue(result.cached)
+        self.assertEqual(result.meaning, "meaning-1")
+        self.assertEqual(second_provider.calls, 0)
+        self.assertEqual(self.usage_count(), 1)
+
     def test_limit_blocks_renew_before_provider_call(self):
         provider = FakeProvider()
         explain_term(session=self.session, current_user=self.user, req=self.request(), provider=provider, limit=1)

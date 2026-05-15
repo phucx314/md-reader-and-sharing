@@ -80,6 +80,28 @@ def get_cache(
     ).first()
 
 
+def get_file_term_cache(
+    session: Session,
+    *,
+    user_id: int,
+    selected_text_norm: str,
+    local_file_id: str | None,
+    language: str,
+) -> ExplanationCache | None:
+    if not local_file_id:
+        return None
+    return session.exec(
+        select(ExplanationCache)
+        .where(
+            ExplanationCache.user_id == user_id,
+            ExplanationCache.selected_text_norm == selected_text_norm,
+            ExplanationCache.local_file_id == local_file_id,
+            ExplanationCache.language == language,
+        )
+        .order_by(ExplanationCache.updated_at.desc(), ExplanationCache.id.desc())
+    ).first()
+
+
 def increment_usage_or_raise(session: Session, user_id: int, limit: int = EXPLAIN_DAILY_LIMIT) -> ExplainUsage:
     date_key = today_key()
     usage = get_usage(session, user_id, date_key)
@@ -138,6 +160,16 @@ def explain_term(
     )
     if cached and not req.renew:
         return response_from_cache(cached, session)
+    if not req.renew:
+        file_term_cached = get_file_term_cache(
+            session,
+            user_id=current_user.id,
+            selected_text_norm=selected_norm,
+            local_file_id=req.local_file_id,
+            language=req.language,
+        )
+        if file_term_cached:
+            return response_from_cache(file_term_cached, session)
 
     usage = increment_usage_or_raise(session, current_user.id, limit)
     result = provider.explain(selected_text=selected, context=ctx, language=req.language)
