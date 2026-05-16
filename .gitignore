@@ -51,3 +51,4 @@ mobile/.env.local
 *.pem
 *.key
 Thumbs.db
+implement plans/

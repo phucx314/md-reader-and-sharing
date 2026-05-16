@@ -40,11 +40,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
     setLoading(true);
     try {
       if (isLogin) {
-        const formData = new FormData();
-        formData.append('username', username);
-        formData.append('password', password);
-        const response = await apiClient.post('/api/auth/login', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        const formBody = `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+        const response = await apiClient.post('/api/auth/login', formBody, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         });
         await login(response.data.access_token);
         Toast.show({ position: 'bottom', type: 'success', text1: 'Logged in!' });
@@ -58,7 +56,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       const detail = error.response?.data?.detail;
       const errorMessage = Array.isArray(detail)
         ? detail.map((d: any) => d.msg).join(', ')
-        : detail || 'Unknown error';
+        : detail || error.message || 'Unknown error';
       Toast.show({ position: 'bottom', type: 'error', text1: 'Authentication failed', text2: errorMessage });
     } finally {
       setLoading(false);
