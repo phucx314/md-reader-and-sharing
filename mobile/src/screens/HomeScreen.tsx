@@ -605,7 +605,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Ionicons name="link-outline" size={20} color={colors.text} />
               <ThemedText style={styles.menuText}>My Links</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); Toast.show({ position: 'bottom', type: 'info', text1: 'Coming soon!' }); }}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); navigation.navigate('Settings'); }}>
               <Ionicons name="settings-outline" size={20} color={colors.text} />
               <ThemedText style={styles.menuText}>Settings</ThemedText>
             </TouchableOpacity>

@@ -10,6 +10,7 @@ import { MermaidViewerScreen } from '../screens/MermaidViewerScreen';
 import { TableViewerScreen } from '../screens/TableViewerScreen';
 import { ExplainViewerScreen } from '../screens/ExplainViewerScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
 
 const Stack = createStackNavigator();
 
@@ -23,6 +24,7 @@ export const AppNavigator = () => {
         <Stack.Screen name="TableViewer" component={TableViewerScreen} />
         <Stack.Screen name="ExplainViewer" component={ExplainViewerScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Auth" component={AuthScreen} />
         <Stack.Screen name="Share" component={ShareScreen} />
       </Stack.Navigator>

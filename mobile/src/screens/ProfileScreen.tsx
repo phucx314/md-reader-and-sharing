@@ -117,6 +117,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             <Ionicons name="link-outline" size={18} color={colors.text} />
             <ThemedText type="label">My Links</ThemedText>
           </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, { borderColor: colors.border }]} onPress={() => navigation.navigate('Settings')}>
+            <Ionicons name="settings-outline" size={18} color={colors.text} />
+            <ThemedText type="label">Settings</ThemedText>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, { borderColor: colors.border }]} onPress={toggleTheme}>
             <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={18} color={colors.text} />
             <ThemedText type="label">Toggle Theme</ThemedText>
@@ -201,4 +205,3 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 });
-
