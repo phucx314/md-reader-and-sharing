@@ -6,6 +6,7 @@ export interface LocalFile {
   filename: string;
   uri: string;
   createdAt: number;
+  origin?: 'local' | 'imported';
 }
 
 const STORE_KEY = '@local_files';
@@ -44,7 +45,7 @@ export const saveFile = async (file: LocalFile) => {
   const files = await getFiles();
   const index = files.findIndex(f => f.id === file.id);
   if (index >= 0) {
-    files[index] = file;
+    files[index] = { ...files[index], ...file };
   } else {
     files.push(file);
   }
@@ -101,7 +102,8 @@ export const syncFilesWithFS = async () => {
           id: generateUUID(),
           filename: fsFile,
           uri: `${dir}${fsFile}`,
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          origin: 'local',
         });
         isDirty = true;
       }

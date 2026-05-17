@@ -189,6 +189,61 @@ def get_my_links(
 class TokenList(BaseModel):
     tokens: List[str]
 
+
+class ShareStatusRequest(BaseModel):
+    local_file_ids: List[str]
+
+
+@router.post("/status")
+def get_share_status(
+    body: ShareStatusRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    ids = [i.strip() for i in body.local_file_ids if i and i.strip()]
+    if not ids:
+        return {"items": []}
+
+    now = datetime.now(timezone.utc)
+    links = session.exec(
+        select(ShareLink).where(
+            ShareLink.user_id == current_user.id,
+            ShareLink.local_file_id.in_(ids),
+        )
+    ).all()
+
+    result_map: dict[str, dict[str, bool]] = {
+        i: {"ever_shared": False, "active_shared": False} for i in ids
+    }
+    for link in links:
+        if not link.local_file_id:
+            continue
+        key = str(link.local_file_id)
+        state = result_map.get(key)
+        if not state:
+            continue
+        state["ever_shared"] = True
+        if link.expires_at is None:
+            state["active_shared"] = True
+        else:
+            exp = (
+                link.expires_at.replace(tzinfo=timezone.utc)
+                if link.expires_at.tzinfo is None
+                else link.expires_at
+            )
+            if exp > now:
+                state["active_shared"] = True
+
+    items = [
+        {
+            "local_file_id": k,
+            "ever_shared": v["ever_shared"],
+            "active_shared": v["active_shared"],
+        }
+        for k, v in result_map.items()
+    ]
+    return {"items": items}
+
 @router.post("/batch-revoke", status_code=status.HTTP_204_NO_CONTENT)
 def batch_revoke_links(
     body: TokenList,

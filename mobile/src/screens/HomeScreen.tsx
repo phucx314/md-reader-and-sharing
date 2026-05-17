@@ -22,6 +22,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { syncFilesWithFS, deleteFile as deleteFileFromStore } from '../utils/fileStore';
 import { saveFile, generateUUID, getFileByName } from '../utils/fileStore';
 import { API_URL } from '../api/client';
+import { apiClient } from '../api/client';
 import axios from 'axios';
 
 import { ThemedView } from '../components/ThemedView';
@@ -37,6 +38,7 @@ interface FileInfo {
   uri: string;
   size: number;
   mtime: number;
+  origin?: 'local' | 'imported';
 };
 type HomeScreenProps = { navigation: StackNavigationProp<any, any> };
 
@@ -66,6 +68,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [sections, setSections] = useState<{ title: string; data: FileInfo[] }[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [shareStatusMap, setShareStatusMap] = useState<Record<string, { ever_shared: boolean; active_shared: boolean }>>({});
   const { colors, isDark, toggleTheme } = useTheme();
   const { token, username, logout } = useAuth();
   
@@ -133,12 +136,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       const infos = await Promise.all(
         (dbFiles || []).map(async (f) => {
           const info = await FileSystem.getInfoAsync(f.uri);
+          const filenameLower = String(f.filename || '').toLowerCase();
+          const inferredImported = filenameLower.startsWith('imported-');
           return {
             id: f.id,
             name: f.filename, 
             uri: f.uri, 
             size: info.exists ? (info as any).size ?? 0 : 0,
-            mtime: info.exists ? (info as any).modificationTime ?? 0 : 0
+            mtime: info.exists ? (info as any).modificationTime ?? 0 : 0,
+            origin: ((f as any).origin === 'imported' || inferredImported) ? 'imported' : 'local',
           };
         })
       );
@@ -171,12 +177,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       setFiles(validFiles);
       setSections(newSections);
+
+      if (token) {
+        try {
+          const fileIds = validFiles.map((f) => f.id).filter(Boolean) as string[];
+          if (fileIds.length === 0) {
+            setShareStatusMap({});
+          } else {
+            const response = await apiClient.post('/api/share/status', { local_file_ids: fileIds });
+            const items = Array.isArray(response?.data?.items) ? response.data.items : [];
+            const map: Record<string, { ever_shared: boolean; active_shared: boolean }> = {};
+            items.forEach((item: any) => {
+              if (!item?.local_file_id) return;
+              map[String(item.local_file_id)] = {
+                ever_shared: Boolean(item.ever_shared),
+                active_shared: Boolean(item.active_shared),
+              };
+            });
+            setShareStatusMap(map);
+          }
+        } catch {
+          setShareStatusMap({});
+        }
+      } else {
+        setShareStatusMap({});
+      }
     } catch (e) {
       console.error(e);
     }
   };
 
-  useFocusEffect(useCallback(() => { loadFiles(); }, []));
+  useFocusEffect(useCallback(() => { loadFiles(); }, [token]));
 
   const onRefresh = async () => { setRefreshing(true); await loadFiles(); setRefreshing(false); };
 
@@ -185,8 +216,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       const result = await DocumentPicker.getDocumentAsync({ type: ['text/markdown', 'text/plain'], copyToCacheDirectory: true });
       if (!result.canceled && result.assets?.length) {
         const asset = result.assets[0];
-        const newUri = `${DIR_URI}${asset.name.endsWith('.md') ? asset.name : asset.name + '.md'}`;
+        const finalFilename = asset.name.endsWith('.md') ? asset.name : `${asset.name}.md`;
+        const newUri = `${DIR_URI}${finalFilename}`;
         await FileSystem.copyAsync({ from: asset.uri, to: newUri });
+        await saveFile({
+          id: generateUUID(),
+          filename: finalFilename,
+          uri: newUri,
+          createdAt: Date.now(),
+          origin: 'imported',
+        });
         await loadFiles();
       }
     } catch (err) { console.error(err); }
@@ -276,6 +315,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         filename: finalFilename,
         uri: newUri,
         createdAt: Date.now(),
+        origin: 'imported',
       });
 
       setImportUrlModalVisible(false);
@@ -412,22 +452,46 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </View>
 
               <View style={styles.fileDetails}>
-                <ThemedText type="label" numberOfLines={1}>
-                  {item.name.replace('.md', '')}
-                </ThemedText>
-                <ThemedText type="caption" muted>{(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}</ThemedText>
+                <View style={styles.fileTitleRow}>
+                  <ThemedText type="label" numberOfLines={1} style={{ flex: 1 }}>
+                    {item.name.replace('.md', '')}
+                  </ThemedText>
+                </View>
+                {(() => {
+                  const shareState = item.id ? shareStatusMap[item.id] : undefined;
+                  const wasEverShared = Boolean(shareState?.ever_shared);
+                  const isActiveShared = Boolean(shareState?.active_shared);
+                  const isImported = item.origin === 'imported';
+                  return (
+                    <View style={styles.metaRow}>
+                      <ThemedText type="caption" muted>
+                        {(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}
+                      </ThemedText>
+                      <View style={styles.metaIconsRow}>
+                        {isImported ? (
+                          <Ionicons name="download-outline" size={14} color={isDark ? '#9AE6B4' : '#166534'} />
+                        ) : null}
+                        {wasEverShared ? (
+                          <Ionicons name="cloud-done-outline" size={14} color={colors.textMuted} />
+                        ) : null}
+                        {isActiveShared ? (
+                          <Ionicons name="share-social-outline" size={14} color={colors.success} />
+                        ) : null}
+                      </View>
+                    </View>
+                  );
+                })()}
               </View>
 
-              <View style={styles.fileActions}>
+              <View style={[styles.fileActions, { marginLeft: 'auto' }]}>
                 <TouchableOpacity
                   onPress={() => confirmDelete(item.id, item.uri, item.name)}
-                  style={styles.deleteButton}
+                  style={[styles.deleteButton, { borderColor: colors.border }]}
                   accessibilityLabel={`Delete ${item.name}`}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <Ionicons name="trash-outline" size={18} color={colors.error} />
                 </TouchableOpacity>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} style={{ marginLeft: 8 }} />
               </View>
             </ThemedView>
           </TouchableOpacity>
@@ -617,8 +681,29 @@ const styles = StyleSheet.create({
     right: 48,
   },
   fileDetails: { flex: 1 },
+  fileTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metaIconsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   fileActions: { flexDirection: 'row', alignItems: 'center' },
-  deleteButton: { padding: 4 },
+  deleteButton: {
+    width: 34,
+    height: 34,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   fileCard: {
     flexDirection: 'row',
     alignItems: 'center',
