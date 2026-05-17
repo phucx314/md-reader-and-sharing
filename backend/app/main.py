@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from contextlib import asynccontextmanager
 
-from app.database import engine
+from app.database import engine, sync_postgres_sequences
 from sqlmodel import SQLModel
 
 # Import models so they are registered with SQLModel metadata before creating tables
@@ -56,6 +56,7 @@ async def cleanup_expired_links():
 async def lifespan(app: FastAPI):
     # Startup: create db tables
     SQLModel.metadata.create_all(engine)
+    sync_postgres_sequences()
     
     # Start cleanup task
     task = asyncio.create_task(cleanup_expired_links())
