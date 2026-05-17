@@ -213,10 +213,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const importFile = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: ['text/markdown', 'text/plain'], copyToCacheDirectory: true });
-      if (!result.canceled && result.assets?.length) {
-        const asset = result.assets[0];
-        const finalFilename = asset.name.endsWith('.md') ? asset.name : `${asset.name}.md`;
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/markdown', 'text/plain'],
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+
+      const getUniqueFilename = async (baseName: string): Promise<string> => {
+        const safeBase = baseName.endsWith('.md') ? baseName : `${baseName}.md`;
+        const stem = safeBase.replace(/\.md$/i, '');
+        let candidate = safeBase;
+        let counter = 1;
+        while (true) {
+          const existsInStore = await getFileByName(candidate);
+          const existsInFs = await FileSystem.getInfoAsync(`${DIR_URI}${candidate}`);
+          if (!existsInStore && !existsInFs.exists) return candidate;
+          candidate = `${stem} (${counter}).md`;
+          counter += 1;
+        }
+      };
+
+      let importedCount = 0;
+      for (const asset of result.assets) {
+        const finalFilename = await getUniqueFilename(asset.name || 'imported.md');
         const newUri = `${DIR_URI}${finalFilename}`;
         await FileSystem.copyAsync({ from: asset.uri, to: newUri });
         await saveFile({
@@ -224,10 +244,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           filename: finalFilename,
           uri: newUri,
           createdAt: Date.now(),
-          origin: 'imported',
+          origin: 'local',
         });
-        await loadFiles();
+        importedCount += 1;
       }
+
+      await loadFiles();
+      Toast.show({
+        position: 'bottom',
+        type: 'success',
+        text1: importedCount === 1 ? 'Imported 1 file' : `Imported ${importedCount} files`,
+      });
     } catch (err) { console.error(err); }
   };
 
