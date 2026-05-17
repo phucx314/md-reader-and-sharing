@@ -7,7 +7,9 @@ class ShareLink(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     token: str = Field(unique=True, index=True)
     user_id: int
-    file_path: str
+    file_path: Optional[str] = None
+    storage_provider: str = Field(default="local", index=True)
+    object_key: Optional[str] = Field(default=None, index=True)
     original_filename: str
     local_file_id: Optional[str] = Field(default=None, index=True)
     is_anonymous: bool = False

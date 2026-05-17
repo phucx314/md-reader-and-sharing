@@ -10,11 +10,19 @@ from sqlmodel import SQLModel
 
 from app.routers import auth, explain, share, view
 import asyncio
-import os
 from datetime import datetime, timezone, timedelta
 from sqlmodel import Session, select
 from app.models.share import ShareLink
 from app.models.explanation import ExplanationCache, ExplainUsage  # noqa: F401
+from app.services.storage import get_storage_provider_by_name
+
+
+def resolve_object_ref(link: ShareLink) -> str:
+    if link.object_key:
+        return link.object_key
+    if link.file_path:
+        return link.file_path
+    return ""
 
 async def cleanup_expired_links():
     while True:
@@ -28,9 +36,11 @@ async def cleanup_expired_links():
                 ).all()
                 
                 for link in expired_links:
-                    if os.path.exists(link.file_path):
+                    object_ref = resolve_object_ref(link)
+                    if object_ref:
                         try:
-                            os.remove(link.file_path)
+                            storage = get_storage_provider_by_name(link.storage_provider)
+                            storage.delete(object_ref=object_ref)
                         except Exception:
                             pass
                     session.delete(link)

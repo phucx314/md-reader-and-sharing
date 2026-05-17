@@ -1,6 +1,5 @@
 import os
 import uuid
-import aiofiles
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from pydantic import BaseModel
@@ -22,8 +21,17 @@ from app.models.user import User
 from app.models.share import ShareLink, ShareLinkRead, PaginatedShareLinks
 from app.routers.auth import get_current_user
 from app.config import UPLOAD_DIR
+from app.services.storage import get_storage_provider, get_storage_provider_by_name
 
 router = APIRouter(prefix="/api/share", tags=["share"])
+
+
+def resolve_object_ref(link: ShareLink) -> str:
+    if link.object_key:
+        return link.object_key
+    if link.file_path:
+        return link.file_path
+    return ""
 
 
 @router.post("", response_model=ShareLinkRead)
@@ -98,9 +106,11 @@ async def create_share_link(
         existing_links = session.exec(query).all()
         for el in existing_links:
             if is_same_settings(el):
-                if os.path.exists(el.file_path):
+                object_ref = resolve_object_ref(el)
+                if object_ref:
                     try:
-                        os.remove(el.file_path)
+                        storage = get_storage_provider_by_name(el.storage_provider)
+                        storage.delete(object_ref=object_ref)
                     except Exception:
                         pass
                 session.delete(el)
@@ -109,11 +119,16 @@ async def create_share_link(
     token = str(uuid.uuid4())
     file_ext = os.path.splitext(filename)[1]
     secure_filename = f"{token}{file_ext}"
-    file_path = os.path.join(UPLOAD_DIR, secure_filename)
-
-    async with aiofiles.open(file_path, "wb") as out_file:
-        content = await file.read()
-        await out_file.write(content)
+    storage = get_storage_provider()
+    content = await file.read()
+    storage_key = os.path.join(UPLOAD_DIR, secure_filename)
+    if storage.provider_name == "r2":
+        storage_key = f"shares/{current_user.id}/{local_file_id or 'no-file-id'}/{secure_filename}"
+    object_ref = storage.write_bytes(
+        key=storage_key,
+        data=content,
+        content_type="text/markdown; charset=utf-8",
+    )
 
     expires_at = None
     if expires_in_hours:
@@ -122,7 +137,9 @@ async def create_share_link(
     share_link = ShareLink(
         token=token,
         user_id=current_user.id,
-        file_path=file_path,
+        file_path=object_ref if storage.provider_name == "local" else None,
+        storage_provider=storage.provider_name,
+        object_key=object_ref if storage.provider_name != "local" else None,
         original_filename=filename,
         local_file_id=local_file_id,
         is_anonymous=is_anonymous,
@@ -186,9 +203,11 @@ def batch_revoke_links(
     ).all()
 
     for link in links:
-        if os.path.exists(link.file_path):
+        object_ref = resolve_object_ref(link)
+        if object_ref:
             try:
-                os.remove(link.file_path)
+                storage = get_storage_provider_by_name(link.storage_provider)
+                storage.delete(object_ref=object_ref)
             except Exception:
                 pass
         session.delete(link)
@@ -206,9 +225,11 @@ def revoke_all_links(
     ).all()
 
     for link in links:
-        if os.path.exists(link.file_path):
+        object_ref = resolve_object_ref(link)
+        if object_ref:
             try:
-                os.remove(link.file_path)
+                storage = get_storage_provider_by_name(link.storage_provider)
+                storage.delete(object_ref=object_ref)
             except Exception:
                 pass
         session.delete(link)
@@ -232,9 +253,13 @@ def revoke_link(
             status_code=404, detail="Link not found or not owned by you"
         )
 
-    # Delete file
-    if os.path.exists(link.file_path):
-        os.remove(link.file_path)
+    object_ref = resolve_object_ref(link)
+    if object_ref:
+        try:
+            storage = get_storage_provider_by_name(link.storage_provider)
+            storage.delete(object_ref=object_ref)
+        except Exception:
+            pass
 
     session.delete(link)
     session.commit()
