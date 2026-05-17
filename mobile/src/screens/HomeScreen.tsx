@@ -71,14 +71,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [shareStatusMap, setShareStatusMap] = useState<Record<string, { ever_shared: boolean; active_shared: boolean }>>({});
   const { colors, isDark, toggleTheme } = useTheme();
   const { token, username, logout } = useAuth();
-  
+
   const [isFabOpen, setIsFabOpen] = useState(false);
   const fabAnim = React.useRef(new Animated.Value(0)).current;
   const subFabExtendedAnim = React.useRef(new Animated.Value(1)).current;
   const subFabTimer = React.useRef<NodeJS.Timeout | null>(null);
 
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [fileToDelete, setFileToDelete] = useState<{id?: string, uri: string, name: string} | null>(null);
+  const [fileToDelete, setFileToDelete] = useState<{ id?: string, uri: string, name: string } | null>(null);
 
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
@@ -94,7 +94,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       tension: 60,
       useNativeDriver: true,
     }).start();
-    
+
     if (!isFabOpen) {
       // Opening
       subFabExtendedAnim.setValue(1);
@@ -110,7 +110,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       // Closing
       if (subFabTimer.current) clearTimeout(subFabTimer.current);
     }
-    
+
     setIsFabOpen(!isFabOpen);
   };
 
@@ -130,9 +130,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (!dirInfo.exists) {
         await FileSystem.makeDirectoryAsync(DIR_URI, { intermediates: true });
       }
-      
+
       const dbFiles = await syncFilesWithFS();
-      
+
       const infos = await Promise.all(
         (dbFiles || []).map(async (f) => {
           const info = await FileSystem.getInfoAsync(f.uri);
@@ -140,17 +140,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           const inferredImported = filenameLower.startsWith('imported-');
           return {
             id: f.id,
-            name: f.filename, 
-            uri: f.uri, 
+            name: f.filename,
+            uri: f.uri,
             size: info.exists ? (info as any).size ?? 0 : 0,
             mtime: info.exists ? (info as any).modificationTime ?? 0 : 0,
-            origin: ((f as any).origin === 'imported' || inferredImported) ? 'imported' : 'local',
+            origin: (((f as any).origin === 'imported' || inferredImported) ? 'imported' : 'local') as 'local' | 'imported',
           };
         })
       );
-      
+
       const validFiles = infos.filter((f) => f.name.endsWith('.md'));
-      
+
       const today: FileInfo[] = [];
       const thisWeek: FileInfo[] = [];
       const thisMonth: FileInfo[] = [];
@@ -170,10 +170,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       });
 
       const newSections = [];
-      if (today.length) newSections.push({ title: 'Today', data: today.sort((a,b) => b.mtime - a.mtime) });
-      if (thisWeek.length) newSections.push({ title: 'This Week', data: thisWeek.sort((a,b) => b.mtime - a.mtime) });
-      if (thisMonth.length) newSections.push({ title: 'This Month', data: thisMonth.sort((a,b) => b.mtime - a.mtime) });
-      if (older.length) newSections.push({ title: 'Older', data: older.sort((a,b) => b.mtime - a.mtime) });
+      if (today.length) newSections.push({ title: 'Today', data: today.sort((a, b) => b.mtime - a.mtime) });
+      if (thisWeek.length) newSections.push({ title: 'This Week', data: thisWeek.sort((a, b) => b.mtime - a.mtime) });
+      if (thisMonth.length) newSections.push({ title: 'This Month', data: thisMonth.sort((a, b) => b.mtime - a.mtime) });
+      if (older.length) newSections.push({ title: 'Older', data: older.sort((a, b) => b.mtime - a.mtime) });
 
       setFiles(validFiles);
       setSections(newSections);
@@ -413,16 +413,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       </View>
 
       {/* ─── File list ────────────────────────────── */}
+      <View style={[styles.legendRow, { borderBottomColor: colors.border }]}>
+        <View style={styles.legendItem}>
+          <Ionicons name="download-outline" size={13} color={isDark ? '#9AE6B4' : '#166534'} />
+          <ThemedText type="caption" muted>Imported</ThemedText>
+        </View>
+        <View style={styles.legendItem}>
+          <Ionicons name="cloud-done-outline" size={13} color={colors.textMuted} />
+          <ThemedText type="caption" muted>Cloud saved</ThemedText>
+        </View>
+        <View style={styles.legendItem}>
+          <Ionicons name="share-social-outline" size={13} color={colors.success} />
+          <ThemedText type="caption" muted>Active Link</ThemedText>
+        </View>
+      </View>
+
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.uri}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh} 
-            tintColor={colors.primary} 
-            colors={['#111']} 
-            progressBackgroundColor={colors.primary} 
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={['#111']}
+            progressBackgroundColor={colors.primary}
           />
         }
         contentContainerStyle={[styles.list, files.length === 0 && styles.listEmpty]}
@@ -441,10 +456,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         )}
         renderItem={({ item }) => (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('Editor', { uri: item.uri, name: item.name, fileId: item.id })}
-            >
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Editor', { uri: item.uri, name: item.name, fileId: item.id })}
+          >
             <ThemedView card style={styles.fileCard}>
               {/* File icon badge */}
               <View style={[styles.fileIconBadge, { backgroundColor: colors.primary, borderColor: colors.border }]}>
@@ -502,38 +517,38 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View style={styles.fabContainer}>
         {/* Import Link Button */}
         <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -195] }) }, { scale: fabAnim }] }]}>
-            <TouchableOpacity onPress={() => { closeFab(); setImportUrlModalVisible(true); }} activeOpacity={0.85}>
-              <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
-                <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
-                  Import Link
-                </Animated.Text>
-                <Ionicons name="link-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
-              </Animated.View>
-            </TouchableOpacity>
+          <TouchableOpacity onPress={() => { closeFab(); setImportUrlModalVisible(true); }} activeOpacity={0.85}>
+            <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
+              <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
+                Import Link
+              </Animated.Text>
+              <Ionicons name="link-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
+            </Animated.View>
+          </TouchableOpacity>
         </Animated.View>
 
         {/* Import Button */}
         <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -130] }) }, { scale: fabAnim }] }]}>
-            <TouchableOpacity onPress={() => { closeFab(); importFile(); }} activeOpacity={0.85}>
-              <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
-                <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
-                  Import File
-                </Animated.Text>
-                <Ionicons name="cloud-upload-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
-              </Animated.View>
-            </TouchableOpacity>
+          <TouchableOpacity onPress={() => { closeFab(); importFile(); }} activeOpacity={0.85}>
+            <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
+              <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
+                Import File
+              </Animated.Text>
+              <Ionicons name="cloud-upload-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
+            </Animated.View>
+          </TouchableOpacity>
         </Animated.View>
 
         {/* New Button */}
         <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -65] }) }, { scale: fabAnim }] }]}>
-            <TouchableOpacity onPress={() => { closeFab(); navigation.navigate('Editor', { isNew: true }); }} activeOpacity={0.85}>
-              <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
-                <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
-                  New File
-                </Animated.Text>
-                <Ionicons name="document-text-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
-              </Animated.View>
-            </TouchableOpacity>
+          <TouchableOpacity onPress={() => { closeFab(); navigation.navigate('Editor', { isNew: true }); }} activeOpacity={0.85}>
+            <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
+              <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
+                New File
+              </Animated.Text>
+              <Ionicons name="document-text-outline" size={22} color={colors.text} style={{ paddingRight: 11 }} />
+            </Animated.View>
+          </TouchableOpacity>
         </Animated.View>
 
         {/* Main FAB */}
@@ -657,6 +672,19 @@ const styles = StyleSheet.create({
   },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
   iconButton: { marginLeft: 8, padding: 6 },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   list: { padding: 16, paddingBottom: 100 },
   listEmpty: { flex: 1 },
   sectionHeader: {
@@ -745,21 +773,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 6,
     alignItems: 'flex-end',
-  },
-  subFabPill: {
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-  },
-  subFabPillText: {
-    fontFamily: 'SpaceGrotesk-Bold',
-    fontSize: 14,
-    position: 'absolute',
-    right: 48,
   },
   fabShadow: {
     position: 'absolute',
