@@ -52,3 +52,4 @@ mobile/.env.local
 *.key
 Thumbs.db
 implement plans/
+sample/

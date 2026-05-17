@@ -1,17 +1,28 @@
 # TODO
 
-## Setup
-- [ ] Confirm project stack
-- [ ] Document architecture
-- [ ] Identify main entry points
+## Done
+- [x] Mobile stack implemented (Expo React Native + TS + React Navigation).
+- [x] Backend stack implemented (FastAPI + SQLModel + JWT auth + SQLite).
+- [x] Markdown edit/preview flow with save/autosave and undo/redo (edit mode).
+- [x] Share link flow (create/list/revoke/batch revoke/revoke all) with public view/download endpoints.
+- [x] Mermaid preview + full viewer (native zoom + orientation toggle).
+- [x] Wide-table handling (preview card + show-here + external table viewer).
+- [x] Explain-term flow from preview selection to backend LLM response with cache + daily limit.
+- [x] Release build scaffolding (`mobile/eas.json`) and backend deploy dependency file (`backend/requirements.txt`).
+- [x] API URL sanitization (trailing slash stripping in mobile client).
+- [x] Auth refactored to `x-www-form-urlencoded` for mobile compatibility.
 
-## Markdown Chat
-- [ ] Implement markdown parsing
-- [ ] Implement chunking
-- [ ] Implement chat over markdown content
-- [ ] Add citations or source references
+## Next Fixes (High Priority)
+- [ ] Remove invalid non-env line from `backend/.env` (`Continue Codex at ...`).
+- [ ] Expand `backend/.env.example` with all required env vars (`LLM_PROVIDER`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_MODEL`, `LLM_MODEL`, `EXPLAIN_DAILY_LIMIT`).
+- [ ] Expand `mobile/.env.example` to document production URL usage and the build-time binding behavior of `EXPO_PUBLIC_API_URL`.
+- [ ] Add explicit startup/runtime validation for required mobile env (`EXPO_PUBLIC_API_URL`) with clear error messaging.
+- [ ] Re-check share cleanup policy (`expires_at < now - 7 days`) and align behavior with intended expiry semantics.
 
-## Quality
-- [ ] Add tests
-- [ ] Add error handling
-- [ ] Add loading/empty states
+## Quality / Hardening
+- [ ] Add integration tests for auth/share/explain API routes.
+- [ ] Add migration path away from SQLite local file for production deployment.
+- [ ] Tighten production CORS policy (currently wildcard `*`).
+- [ ] Populate or remove empty `mobile/src/types/` directory; extract shared TypeScript interfaces from inline definitions.
+- [ ] Consolidate virtual environments (both `backend/venv/` and root `.venv/` exist).
+- [ ] Add CI pipeline (lint, type-check, test) for both mobile and backend.
