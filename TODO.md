@@ -11,13 +11,17 @@
 - [x] Release build scaffolding (`mobile/eas.json`) and backend deploy dependency file (`backend/requirements.txt`).
 - [x] API URL sanitization (trailing slash stripping in mobile client).
 - [x] Auth refactored to `x-www-form-urlencoded` for mobile compatibility.
+- [x] Backend `DATABASE_URL` support with SQLite fallback and Postgres URL normalization.
+- [x] Storage abstraction implemented (`local`/`r2`) and integrated into share/view/cleanup flows.
+- [x] `backend/.env.example` expanded with DB/storage/LLM env docs.
 
 ## Next Fixes (High Priority)
 - [ ] Remove invalid non-env line from `backend/.env` (`Continue Codex at ...`).
-- [ ] Expand `backend/.env.example` with all required env vars (`LLM_PROVIDER`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_MODEL`, `LLM_MODEL`, `EXPLAIN_DAILY_LIMIT`).
 - [ ] Expand `mobile/.env.example` to document production URL usage and the build-time binding behavior of `EXPO_PUBLIC_API_URL`.
 - [ ] Add explicit startup/runtime validation for required mobile env (`EXPO_PUBLIC_API_URL`) with clear error messaging.
 - [ ] Re-check share cleanup policy (`expires_at < now - 7 days`) and align behavior with intended expiry semantics.
+- [ ] Add DB migration strategy for existing local SQLite data when switching to Postgres in production.
+- [ ] Add one-time object migration utility from local `uploads/` to R2 for existing share records.
 
 ## Quality / Hardening
 - [ ] Add integration tests for auth/share/explain API routes.

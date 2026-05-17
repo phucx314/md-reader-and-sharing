@@ -1,15 +1,23 @@
-import os
 from datetime import datetime, timezone
 import markdown
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse, Response
+from fastapi.responses import HTMLResponse, Response
 from sqlmodel import Session, select
 from app.database import get_session
 from app.models.share import ShareLink
 from app.models.user import User
+from app.services.storage import get_storage_provider_by_name
 
 router = APIRouter(prefix="/view", tags=["view"])
+
+
+def resolve_object_ref(link: ShareLink) -> str:
+    if link.object_key:
+        return link.object_key
+    if link.file_path:
+        return link.file_path
+    return ""
 
 
 def get_valid_link(token: str, session: Session) -> tuple[ShareLink, Optional[User]]:
@@ -22,7 +30,9 @@ def get_valid_link(token: str, session: Session) -> tuple[ShareLink, Optional[Us
         if expires_at < datetime.now(timezone.utc):
             raise HTTPException(status_code=410, detail="Link has expired")
 
-    if not os.path.exists(link.file_path):
+    storage = get_storage_provider_by_name(link.storage_provider)
+    object_ref = resolve_object_ref(link)
+    if not object_ref or not storage.exists(object_ref=object_ref):
         raise HTTPException(status_code=404, detail="File no longer exists on server")
 
     user = session.exec(select(User).where(User.id == link.user_id)).first()
@@ -32,9 +42,10 @@ def get_valid_link(token: str, session: Session) -> tuple[ShareLink, Optional[Us
 @router.get("/{token}", response_class=HTMLResponse)
 async def view_markdown_html(token: str, session: Session = Depends(get_session)):
     link, user = get_valid_link(token, session)
+    storage = get_storage_provider_by_name(link.storage_provider)
+    object_ref = resolve_object_ref(link)
 
-    with open(link.file_path, "r", encoding="utf-8") as f:
-        md_content = f.read()
+    md_content = storage.read_bytes(object_ref=object_ref).decode("utf-8")
 
     html_content = markdown.markdown(
         md_content, extensions=["fenced_code", "tables", "nl2br"]
@@ -187,9 +198,9 @@ def generate_html_page(link, html_content, author_info="", token=None):
 @router.get("/{token}/download")
 async def download_file(token: str, format: str = "md", session: Session = Depends(get_session)):
     link, _ = get_valid_link(token, session)
-    
-    with open(link.file_path, "rb") as f:
-        content = f.read()
+    storage = get_storage_provider_by_name(link.storage_provider)
+    object_ref = resolve_object_ref(link)
+    content = storage.read_bytes(object_ref=object_ref)
         
     if format == "html":
         md_content = content.decode("utf-8")

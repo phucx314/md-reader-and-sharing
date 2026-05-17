@@ -9,3 +9,5 @@ python-multipart
 email-validator
 markdown
 aiofiles
+boto3
+psycopg[binary]
