@@ -85,6 +85,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [importUrlModalVisible, setImportUrlModalVisible] = useState(false);
   const [importUrlInput, setImportUrlInput] = useState('');
   const [importingUrl, setImportingUrl] = useState(false);
+  const [isFabPressed, setIsFabPressed] = useState(false);
 
   const toggleFab = () => {
     const toValue = isFabOpen ? 0 : 1;
@@ -579,18 +580,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </Animated.View>
 
         {/* Main FAB */}
-        <TouchableOpacity
+        <Pressable
           style={styles.mainFabWrap}
           onPress={toggleFab}
-          activeOpacity={0.85}
+          onPressIn={() => setIsFabPressed(true)}
+          onPressOut={() => setIsFabPressed(false)}
         >
           <View style={[styles.fabShadow, { backgroundColor: colors.shadow }]} />
           <Animated.View style={[styles.fab, { backgroundColor: colors.primary, borderColor: colors.border }, {
-            transform: [{ rotate: fabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) }],
+            transform: [
+              { translateX: isFabPressed ? 3 : 0 },
+              { translateY: isFabPressed ? 3 : 0 },
+              { rotate: fabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) },
+            ],
           }]}>
             <Ionicons name="add" size={30} color="#111" />
           </Animated.View>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       {/* ─── Modals ──────────────────────── */}
