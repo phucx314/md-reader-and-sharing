@@ -9,6 +9,7 @@ import {
   Alert,
   Animated,
   Modal,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -19,6 +20,9 @@ import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { syncFilesWithFS, deleteFile as deleteFileFromStore } from '../utils/fileStore';
+import { saveFile, generateUUID, getFileByName } from '../utils/fileStore';
+import { API_URL } from '../api/client';
+import axios from 'axios';
 
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
@@ -75,6 +79,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
+  const [importUrlModalVisible, setImportUrlModalVisible] = useState(false);
+  const [importUrlInput, setImportUrlInput] = useState('');
+  const [importingUrl, setImportingUrl] = useState(false);
 
   const toggleFab = () => {
     const toValue = isFabOpen ? 0 : 1;
@@ -183,6 +190,109 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         await loadFiles();
       }
     } catch (err) { console.error(err); }
+  };
+
+  const parseImportUrl = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed) throw new Error('Please enter a URL');
+    const parsed = new URL(trimmed);
+    if (!/^https?:$/.test(parsed.protocol)) {
+      throw new Error('Only http/https URLs are supported');
+    }
+
+    const configuredHost = (() => {
+      try {
+        return API_URL ? new URL(API_URL).host : '';
+      } catch {
+        return '';
+      }
+    })();
+    if (configuredHost && parsed.host !== configuredHost) {
+      throw new Error('Only this app share URL is supported');
+    }
+
+    const viewTokenMatch = parsed.pathname.match(/^\/view\/([^/]+)\/?$/);
+    if (viewTokenMatch) {
+      const token = viewTokenMatch[1];
+      return `${parsed.origin}/view/${token}/download?format=md`;
+    }
+
+    const downloadTokenMatch = parsed.pathname.match(/^\/view\/([^/]+)\/download\/?$/);
+    if (downloadTokenMatch) {
+      parsed.searchParams.set('format', 'md');
+      return parsed.toString();
+    }
+
+    throw new Error('Invalid share URL format');
+  };
+
+  const extractFilenameFromHeaders = (headers: any, fallback: string): string => {
+    const contentDisposition = String(
+      headers?.['content-disposition'] ?? headers?.['Content-Disposition'] ?? ''
+    );
+    const match =
+      contentDisposition.match(/filename\*=UTF-8''([^;]+)/i) ||
+      contentDisposition.match(/filename="?([^"]+)"?/i);
+    const decoded = match?.[1] ? decodeURIComponent(match[1]) : fallback;
+    const safe = decoded.replace(/[\\/:*?"<>|]/g, '_').trim();
+    const named = safe || fallback;
+    return named.endsWith('.md') ? named : `${named}.md`;
+  };
+
+  const importFromUrl = async () => {
+    setImportingUrl(true);
+    try {
+      const downloadUrl = parseImportUrl(importUrlInput);
+      const response = await axios.get(downloadUrl, {
+        responseType: 'text',
+        timeout: 20000,
+      });
+      const body = typeof response.data === 'string' ? response.data : String(response.data ?? '');
+      if (!body.trim()) {
+        throw new Error('Downloaded markdown is empty');
+      }
+
+      const dirInfo = await FileSystem.getInfoAsync(DIR_URI);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(DIR_URI, { intermediates: true });
+      }
+
+      const parsed = new URL(downloadUrl);
+      const token = parsed.pathname.split('/')[2] || generateUUID().slice(0, 8);
+      const baseName = extractFilenameFromHeaders(response.headers, `imported-${token}.md`);
+      let finalFilename = baseName;
+      let counter = 1;
+      while (await getFileByName(finalFilename)) {
+        const stem = baseName.replace(/\.md$/i, '');
+        finalFilename = `${stem} (${counter}).md`;
+        counter += 1;
+      }
+
+      const newUri = `${DIR_URI}${finalFilename}`;
+      await FileSystem.writeAsStringAsync(newUri, body);
+      const newFileId = generateUUID();
+      await saveFile({
+        id: newFileId,
+        filename: finalFilename,
+        uri: newUri,
+        createdAt: Date.now(),
+      });
+
+      setImportUrlModalVisible(false);
+      setImportUrlInput('');
+      await loadFiles();
+      Toast.show({ position: 'bottom', type: 'success', text1: 'Imported from URL' });
+      navigation.navigate('Editor', { uri: newUri, name: finalFilename, fileId: newFileId });
+    } catch (error: any) {
+      const detail = error?.response?.status === 410
+        ? 'This share link has expired'
+        : error?.response?.status === 404
+          ? 'Link not found or revoked'
+          : error?.message || 'Import failed';
+      Toast.show({ position: 'bottom', type: 'error', text1: 'Import failed', text2: detail });
+    } finally {
+      setImportingUrl(false);
+    }
   };
 
   const confirmDelete = (id: string | undefined, uri: string, name: string) => {
@@ -328,7 +438,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View style={styles.fabContainer}>
         {/* Import Link Button */}
         <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -195] }) }, { scale: fabAnim }] }]}>
-            <TouchableOpacity onPress={() => { closeFab(); Toast.show({ position: 'bottom', type: 'info', text1: 'Feature coming soon!' }); }} activeOpacity={0.85}>
+            <TouchableOpacity onPress={() => { closeFab(); setImportUrlModalVisible(true); }} activeOpacity={0.85}>
               <Animated.View style={[styles.subFabPill, { backgroundColor: colors.card, borderColor: colors.border, width: subFabWidth }]}>
                 <Animated.Text style={[styles.subFabPillText, { color: colors.text, opacity: subFabTextOpacity }]} numberOfLines={1}>
                   Import Link
@@ -419,6 +529,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         onConfirm={handleLogout}
         confirmText="Log Out"
       />
+
+      <Modal visible={importUrlModalVisible} transparent animationType="fade" onRequestClose={() => setImportUrlModalVisible(false)}>
+        <View style={styles.menuOverlay}>
+          <View style={[styles.importUrlCard, { backgroundColor: colors.card, borderColor: colors.border, shadowColor: isDark ? 'transparent' : colors.shadow }]}>
+            <ThemedText type="subtitle" style={styles.importUrlTitle}>Import from Link</ThemedText>
+            <TextInput
+              value={importUrlInput}
+              onChangeText={setImportUrlInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="https://.../view/<token>"
+              placeholderTextColor={isDark ? '#777' : '#888'}
+              style={[styles.importUrlInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+            />
+            <View style={styles.importUrlActions}>
+              <TouchableOpacity
+                style={[styles.importUrlBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+                onPress={() => {
+                  if (importingUrl) return;
+                  setImportUrlModalVisible(false);
+                  setImportUrlInput('');
+                }}
+              >
+                <ThemedText type="label">Cancel</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.importUrlBtn, { borderColor: colors.border, backgroundColor: colors.primary, opacity: importingUrl ? 0.8 : 1 }]}
+                onPress={importFromUrl}
+                disabled={importingUrl}
+              >
+                <ThemedText type="label" style={{ color: '#111', fontFamily: 'SpaceGrotesk-Bold' }}>
+                  {importingUrl ? 'Importing…' : 'Import'}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -587,5 +735,38 @@ const styles = StyleSheet.create({
   menuDivider: {
     height: 2,
     marginVertical: 4,
+  },
+  importUrlCard: {
+    marginHorizontal: 16,
+    marginTop: 140,
+    borderWidth: 2,
+    padding: 14,
+    gap: 12,
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+  },
+  importUrlTitle: {
+    fontFamily: 'SpaceGrotesk-Bold',
+  },
+  importUrlInput: {
+    borderWidth: 2,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    fontFamily: 'SpaceGrotesk-Regular',
+    fontSize: 14,
+  },
+  importUrlActions: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  importUrlBtn: {
+    minHeight: 40,
+    minWidth: 96,
+    paddingHorizontal: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
