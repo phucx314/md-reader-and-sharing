@@ -244,7 +244,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           filename: finalFilename,
           uri: newUri,
           createdAt: Date.now(),
-          origin: 'imported',
+          origin: 'local',
         });
         importedCount += 1;
       }
