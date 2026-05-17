@@ -597,7 +597,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <Modal visible={profileMenuVisible} transparent animationType="fade">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setProfileMenuVisible(false)}>
           <View style={[styles.profileMenu, { backgroundColor: colors.card, borderColor: colors.border, shadowColor: isDark ? 'transparent' : colors.shadow }]}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); Toast.show({ position: 'bottom', type: 'info', text1: 'Coming soon!' }); }}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); navigation.navigate('Profile'); }}>
               <Ionicons name="person-outline" size={20} color={colors.text} />
               <ThemedText style={styles.menuText}>Profile</ThemedText>
             </TouchableOpacity>
