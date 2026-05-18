@@ -26,6 +26,7 @@ import { API_URL } from '../api/client';
 import { apiClient } from '../api/client';
 import axios from 'axios';
 import { scanMarkdownFiles, type DeviceMarkdownFile } from '../utils/deviceScan';
+import { getDateTimeFormat, formatAbsoluteDateTime, type DateTimeFormatOption } from '../utils/dateTimeFormat';
 
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
@@ -44,7 +45,7 @@ interface FileInfo {
 };
 type HomeScreenProps = { navigation: StackNavigationProp<any, any> };
 
-const formatTime = (ts: number) => {
+const formatTime = (ts: number, dateTimeFormat: DateTimeFormatOption) => {
   const tsMs = ts > 20000000000 ? ts : ts * 1000;
   const now = new Date();
   const date = new Date(tsMs);
@@ -52,7 +53,7 @@ const formatTime = (ts: number) => {
   const diffInDays = Math.floor(diffInSeconds / 86400);
 
   if (diffInDays > 3) {
-    return date.toLocaleDateString();
+    return formatAbsoluteDateTime(date, dateTimeFormat);
   } else if (diffInDays > 0) {
     return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
   } else if (diffInSeconds >= 3600) {
@@ -66,6 +67,12 @@ const formatTime = (ts: number) => {
   }
 };
 
+const normalizeTimestampForDisplay = (ts: number | null) => {
+  if (!ts) return null;
+  // Keep exactly same behavior as Library cards.
+  return ts > 20000000000 ? ts : ts * 1000;
+};
+
 const toSafeLocalMdFilename = (raw: string) => {
   const trimmed = String(raw || '').trim();
   const base = trimmed.replace(/\\/g, '/').split('/').pop() || 'imported.md';
@@ -76,6 +83,7 @@ const toSafeLocalMdFilename = (raw: string) => {
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const [dateTimeFormat, setDateTimeFormat] = useState<DateTimeFormatOption>('mdy_12h');
   const [activePage, setActivePage] = useState<'library' | 'device'>('library');
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [sections, setSections] = useState<{ title: string; data: FileInfo[] }[]>([]);
@@ -161,7 +169,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setIsScanningDevice(true);
     try {
       const scanned = await scanMarkdownFiles();
-      console.log('[DeviceScan] loadDeviceFiles scanned count=', scanned.length);
       setDeviceFiles(scanned);
       const grouped = scanned.reduce<Record<string, DeviceMarkdownFile[]>>((acc, item) => {
         if (!acc[item.parentLabel]) acc[item.parentLabel] = [];
@@ -172,16 +179,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         .sort()
         .map((k) => ({
           title: k,
-          data: grouped[k].sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0)),
+          data: grouped[k].sort(
+            (a, b) =>
+              (normalizeTimestampForDisplay(b.mtime) ?? 0) -
+              (normalizeTimestampForDisplay(a.mtime) ?? 0)
+          ),
         }));
       setDeviceSections(newSections);
     } catch (e: any) {
-      console.error('[DeviceScan] loadDeviceFiles failed', {
-        message: e?.message,
-        code: e?.code,
-        stack: e?.stack,
-        error: e,
-      });
       setDeviceFiles([]);
       setDeviceSections([]);
     } finally {
@@ -296,6 +301,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   useFocusEffect(useCallback(() => {
     loadFiles();
     loadDeviceFiles();
+    getDateTimeFormat().then(setDateTimeFormat).catch(() => setDateTimeFormat('mdy_12h'));
   }, [token]));
 
   const onRefresh = async () => {
@@ -680,7 +686,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       return (
                         <View style={styles.metaRow}>
                           <ThemedText type="caption" muted>
-                            {(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}
+                        {(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime, dateTimeFormat)}
                           </ThemedText>
                           <View style={styles.metaIconsRow}>
                             {isImported ? (
@@ -750,7 +756,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <View style={styles.fileDetails}>
                 <ThemedText type="label" numberOfLines={1}>{item.name.replace('.md', '')}</ThemedText>
                 <ThemedText type="caption" muted>
-                  {(item.size / 1024).toFixed(1)} KB · {item.mtime ? formatTime(item.mtime) : 'Unknown'}
+                  {(item.size / 1024).toFixed(1)} KB · {item.mtime ? formatTime((normalizeTimestampForDisplay(item.mtime) as number) / 1000, dateTimeFormat) : 'Unknown'}
                 </ThemedText>
               </View>
               <TouchableOpacity

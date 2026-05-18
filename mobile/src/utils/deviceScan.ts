@@ -88,24 +88,12 @@ export const scanMarkdownFiles = async (): Promise<DeviceMarkdownFile[]> => {
   const folders = await getScanFolders();
   const recursiveAll = await getScanRecursiveAll();
   const all: DeviceMarkdownFile[] = [];
-  console.log('[DeviceScan] start scan folders:', folders.map((f) => ({ label: f.label, uri: f.uri })), 'recursiveAll=', recursiveAll);
 
   const walk = async (folder: ScanFolder, dirUri: string, depth: number): Promise<void> => {
     const entries = await FileSystem.StorageAccessFramework.readDirectoryAsync(dirUri);
-    console.log(`[DeviceScan] folder=${folder.label} depth=${depth} entries=${entries.length}`);
     for (const entryUri of entries) {
       try {
         const nativeMeta = await getAndroidDocumentMeta(entryUri);
-        if (nativeMeta) {
-          console.log('[DeviceScan] nativeMeta', {
-            uri: entryUri,
-            displayName: nativeMeta.displayName,
-            size: nativeMeta.size,
-            lastModified: nativeMeta.lastModified,
-            isDirectory: nativeMeta.isDirectory,
-            mimeType: nativeMeta.mimeType,
-          });
-        }
         const name = getDisplayNameFromEntryUri(entryUri);
         if (nativeMeta?.isDirectory === true) {
           if (recursiveAll) {
@@ -134,12 +122,7 @@ export const scanMarkdownFiles = async (): Promise<DeviceMarkdownFile[]> => {
               : null),
         });
       } catch (entryError: any) {
-        console.warn('[DeviceScan] entry skipped', {
-          folder: folder.label,
-          entryUri,
-          message: entryError?.message,
-          code: entryError?.code,
-        });
+        // Skip entries unsupported by provider (common for hidden/system dirs)
         continue;
       }
     }
@@ -149,17 +132,9 @@ export const scanMarkdownFiles = async (): Promise<DeviceMarkdownFile[]> => {
     try {
       await walk(folder, folder.uri, 0);
     } catch (error: any) {
-      console.error('[DeviceScan] scan folder failed', {
-        folder,
-        message: error?.message,
-        code: error?.code,
-        stack: error?.stack,
-        error,
-      });
       continue;
     }
   }
 
-  console.log(`[DeviceScan] total markdown files=${all.length}`);
   return all;
 };

@@ -13,6 +13,12 @@ import { useTheme } from '../context/ThemeContext';
 import { API_URL } from '../api/client';
 import { syncFilesWithFS } from '../utils/fileStore';
 import {
+  DATE_TIME_OPTIONS,
+  getDateTimeFormat,
+  setDateTimeFormat,
+  type DateTimeFormatOption,
+} from '../utils/dateTimeFormat';
+import {
   getScanFolders,
   pickAndAddScanFolder,
   removeScanFolder,
@@ -29,6 +35,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   const [busy, setBusy] = useState(false);
   const [scanFolders, setScanFolders] = useState<ScanFolder[]>([]);
   const [scanRecursiveAll, setScanRecursiveAllState] = useState(true);
+  const [dateTimeFormat, setDateTimeFormatState] = useState<DateTimeFormatOption>('mdy_12h');
 
   const backendHost = useMemo(() => {
     try {
@@ -66,6 +73,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
     const folders = await getScanFolders();
     setScanFolders(folders);
     setScanRecursiveAllState(await getScanRecursiveAll());
+    setDateTimeFormatState(await getDateTimeFormat());
   };
 
   React.useEffect(() => {
@@ -115,6 +123,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
     await setScanRecursiveAll(next);
   };
 
+  const updateDateTimeFormat = async (next: DateTimeFormatOption) => {
+    setDateTimeFormatState(next);
+    await setDateTimeFormat(next);
+    Toast.show({ position: 'bottom', type: 'success', text1: 'Time format updated' });
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
@@ -147,6 +161,27 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
             <Ionicons name="refresh-outline" size={18} color={colors.text} />
             <ThemedText type="label">Show AI Notice Again</ThemedText>
           </TouchableOpacity>
+        </ThemedView>
+
+        <ThemedView card style={styles.section}>
+          <ThemedText type="label" style={styles.sectionTitle}>Date & Time</ThemedText>
+          {DATE_TIME_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.key}
+              style={[
+                styles.actionBtn,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: dateTimeFormat === option.key ? colors.primary : colors.background,
+                },
+              ]}
+              onPress={() => updateDateTimeFormat(option.key)}
+            >
+              <ThemedText type="label" style={{ color: dateTimeFormat === option.key ? '#111' : colors.text }}>
+                {option.label}
+              </ThemedText>
+            </TouchableOpacity>
+          ))}
         </ThemedView>
 
         <ThemedView card style={styles.section}>
