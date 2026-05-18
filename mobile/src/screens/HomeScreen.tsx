@@ -24,6 +24,7 @@ import { saveFile, generateUUID, getFileByName } from '../utils/fileStore';
 import { API_URL } from '../api/client';
 import { apiClient } from '../api/client';
 import axios from 'axios';
+import { scanMarkdownFiles, type DeviceMarkdownFile } from '../utils/deviceScan';
 
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
@@ -65,8 +66,11 @@ const formatTime = (ts: number) => {
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const [activePage, setActivePage] = useState<'library' | 'device'>('library');
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [sections, setSections] = useState<{ title: string; data: FileInfo[] }[]>([]);
+  const [deviceFiles, setDeviceFiles] = useState<DeviceMarkdownFile[]>([]);
+  const [deviceSections, setDeviceSections] = useState<{ title: string; data: DeviceMarkdownFile[] }[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [shareStatusMap, setShareStatusMap] = useState<Record<string, { ever_shared: boolean; active_shared: boolean }>>({});
   const { colors, isDark, toggleTheme } = useTheme();
@@ -139,6 +143,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const handleLogout = () => {
     setLogoutConfirmVisible(false);
     logout();
+  };
+
+  const loadDeviceFiles = async () => {
+    try {
+      const scanned = await scanMarkdownFiles();
+      setDeviceFiles(scanned);
+      const grouped = scanned.reduce<Record<string, DeviceMarkdownFile[]>>((acc, item) => {
+        if (!acc[item.parentLabel]) acc[item.parentLabel] = [];
+        acc[item.parentLabel].push(item);
+        return acc;
+      }, {});
+      const newSections = Object.keys(grouped)
+        .sort()
+        .map((k) => ({
+          title: k,
+          data: grouped[k].sort((a, b) => b.mtime - a.mtime),
+        }));
+      setDeviceSections(newSections);
+    } catch (e) {
+      console.error(e);
+      setDeviceFiles([]);
+      setDeviceSections([]);
+    }
   };
 
   const loadFiles = async () => {
@@ -224,9 +251,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  useFocusEffect(useCallback(() => { loadFiles(); }, [token]));
+  useFocusEffect(useCallback(() => {
+    loadFiles();
+    loadDeviceFiles();
+  }, [token]));
 
-  const onRefresh = async () => { setRefreshing(true); await loadFiles(); setRefreshing(false); };
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadFiles(), loadDeviceFiles()]);
+    setRefreshing(false);
+  };
 
   const importFile = async () => {
     try {
@@ -384,6 +418,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setDeleteConfirmVisible(true);
   };
 
+  const importScannedFile = async (item: DeviceMarkdownFile) => {
+    try {
+      const body = await FileSystem.readAsStringAsync(item.uri);
+      if (!body.trim()) {
+        Toast.show({ position: 'bottom', type: 'error', text1: 'File is empty' });
+        return;
+      }
+
+      let finalFilename = item.name.endsWith('.md') ? item.name : `${item.name}.md`;
+      let counter = 1;
+      while (await getFileByName(finalFilename)) {
+        const stem = item.name.replace(/\.md$/i, '');
+        finalFilename = `${stem} (${counter}).md`;
+        counter += 1;
+      }
+
+      const newUri = `${DIR_URI}${finalFilename}`;
+      await FileSystem.writeAsStringAsync(newUri, body);
+      const newFileId = generateUUID();
+      await saveFile({
+        id: newFileId,
+        filename: finalFilename,
+        uri: newUri,
+        createdAt: Date.now(),
+        origin: 'local',
+      });
+      await loadFiles();
+      Toast.show({ position: 'bottom', type: 'success', text1: 'Imported to Library' });
+    } catch {
+      Toast.show({ position: 'bottom', type: 'error', text1: 'Import failed' });
+    }
+  };
+
   const executeDelete = async () => {
     if (fileToDelete) {
       try {
@@ -456,6 +523,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
 
+      <View style={[styles.pageSwitchRow, { borderBottomColor: colors.border }]}>
+        <View style={[styles.pageSwitch, { borderColor: colors.border, backgroundColor: colors.card }]}>
+          <TouchableOpacity
+            style={[styles.pageSwitchBtn, activePage === 'library' && { backgroundColor: colors.primary }]}
+            onPress={() => setActivePage('library')}
+          >
+            <ThemedText type="caption" style={{ fontFamily: 'SpaceGrotesk-Bold', color: activePage === 'library' ? '#111' : colors.text }}>Library</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.pageSwitchBtn, activePage === 'device' && { backgroundColor: colors.primary }]}
+            onPress={() => setActivePage('device')}
+          >
+            <ThemedText type="caption" style={{ fontFamily: 'SpaceGrotesk-Bold', color: activePage === 'device' ? '#111' : colors.text }}>Device</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {activePage === 'library' && (
+        <>
       {/* ─── File list ────────────────────────────── */}
       <View style={[styles.legendRow, { borderBottomColor: colors.border }]}>
         <View style={styles.legendItem}>
@@ -556,9 +642,60 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         )}
       />
+      </>
+      )}
+
+      {activePage === 'device' && (
+        <SectionList
+          sections={deviceSections}
+          keyExtractor={(item) => item.uri}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={['#111']}
+              progressBackgroundColor={colors.primary}
+            />
+          }
+          contentContainerStyle={[styles.list, deviceFiles.length === 0 && styles.listEmpty]}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyState}>
+              <ThemedText type="subtitle" style={{ marginBottom: 8 }}>No scanned markdown files</ThemedText>
+              <ThemedText muted style={{ textAlign: 'center' }}>
+                Add scan folders in Settings, then pull to refresh.
+              </ThemedText>
+            </View>
+          )}
+          renderSectionHeader={({ section: { title } }) => (
+            <View style={styles.sectionHeader}>
+              <ThemedText type="label" style={{ fontFamily: 'SpaceGrotesk-Bold', color: colors.text }}>{title}</ThemedText>
+            </View>
+          )}
+          renderItem={({ item }) => (
+            <ThemedView card style={styles.fileCard}>
+              <View style={[styles.fileIconBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Ionicons name="document-outline" size={20} color={colors.text} />
+              </View>
+              <View style={styles.fileDetails}>
+                <ThemedText type="label" numberOfLines={1}>{item.name.replace('.md', '')}</ThemedText>
+                <ThemedText type="caption" muted>
+                  {(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}
+                </ThemedText>
+              </View>
+              <TouchableOpacity
+                style={[styles.importDeviceBtn, { borderColor: colors.border, backgroundColor: colors.primary }]}
+                onPress={() => importScannedFile(item)}
+              >
+                <ThemedText type="caption" style={{ fontFamily: 'SpaceGrotesk-Bold', color: '#111' }}>Import</ThemedText>
+              </TouchableOpacity>
+            </ThemedView>
+          )}
+        />
+      )}
 
       {/* ─── Expandable FAB ──────────────────────── */}
-      <View style={styles.fabContainer}>
+      {activePage === 'library' && <View style={styles.fabContainer}>
         {/* Import Link Button */}
         <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -195] }) }, { scale: fabAnim }] }]}>
           <TouchableOpacity onPress={() => { closeFab(); setImportUrlModalVisible(true); }} activeOpacity={0.85}>
@@ -634,7 +771,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Ionicons name="add" size={30} color="#111" />
           </Animated.View>
         </Pressable>
-      </View>
+      </View>}
 
       {/* ─── Modals ──────────────────────── */}
       <Modal visible={profileMenuVisible} transparent animationType="fade">
@@ -742,6 +879,21 @@ const styles = StyleSheet.create({
   },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
   iconButton: { marginLeft: 8, padding: 6 },
+  pageSwitchRow: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+  },
+  pageSwitch: {
+    borderWidth: 2,
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+  },
+  pageSwitchBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -801,6 +953,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  importDeviceBtn: {
+    borderWidth: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
   fileCard: {
     flexDirection: 'row',

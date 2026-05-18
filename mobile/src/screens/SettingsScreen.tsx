@@ -12,12 +12,20 @@ import { BrutalSwitch } from '../components/BrutalSwitch';
 import { useTheme } from '../context/ThemeContext';
 import { API_URL } from '../api/client';
 import { syncFilesWithFS } from '../utils/fileStore';
+import {
+  getScanFolders,
+  pickAndAddScanFolder,
+  removeScanFolder,
+  scanMarkdownFiles,
+  type ScanFolder,
+} from '../utils/deviceScan';
 
 type SettingsScreenProps = { navigation: StackNavigationProp<any, any> };
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const { colors, isDark, toggleTheme } = useTheme();
   const [busy, setBusy] = useState(false);
+  const [scanFolders, setScanFolders] = useState<ScanFolder[]>([]);
 
   const backendHost = useMemo(() => {
     try {
@@ -46,6 +54,53 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
       Toast.show({ position: 'bottom', type: 'success', text1: `Synced ${files.length} files` });
     } catch {
       Toast.show({ position: 'bottom', type: 'error', text1: 'Sync failed' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadScanFolders = async () => {
+    const folders = await getScanFolders();
+    setScanFolders(folders);
+  };
+
+  React.useEffect(() => {
+    loadScanFolders();
+  }, []);
+
+  const addScanFolder = async () => {
+    setBusy(true);
+    try {
+      const added = await pickAndAddScanFolder();
+      await loadScanFolders();
+      if (added) {
+        Toast.show({ position: 'bottom', type: 'success', text1: 'Scan folder added' });
+      }
+    } catch (e: any) {
+      Toast.show({ position: 'bottom', type: 'error', text1: 'Add folder failed', text2: e?.message || '' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteScanFolder = async (uri: string) => {
+    setBusy(true);
+    try {
+      await removeScanFolder(uri);
+      await loadScanFolders();
+      Toast.show({ position: 'bottom', type: 'success', text1: 'Scan folder removed' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rescanDeviceMarkdown = async () => {
+    setBusy(true);
+    try {
+      const items = await scanMarkdownFiles();
+      Toast.show({ position: 'bottom', type: 'success', text1: `Found ${items.length} markdown file(s)` });
+    } catch {
+      Toast.show({ position: 'bottom', type: 'error', text1: 'Rescan failed' });
     } finally {
       setBusy(false);
     }
@@ -95,6 +150,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
             <Ionicons name="sync-outline" size={18} color={colors.text} />
             <ThemedText type="label">Resync Local File Index</ThemedText>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, { borderColor: colors.border, opacity: busy ? 0.7 : 1 }]}
+            onPress={addScanFolder}
+            disabled={busy}
+          >
+            <Ionicons name="folder-open-outline" size={18} color={colors.text} />
+            <ThemedText type="label">Add Scan Folder</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, { borderColor: colors.border, opacity: busy ? 0.7 : 1 }]}
+            onPress={rescanDeviceMarkdown}
+            disabled={busy}
+          >
+            <Ionicons name="scan-outline" size={18} color={colors.text} />
+            <ThemedText type="label">Rescan Device Markdown</ThemedText>
+          </TouchableOpacity>
+          {scanFolders.map((folder) => (
+            <View key={folder.uri} style={[styles.folderRow, { borderColor: colors.border }]}>
+              <ThemedText type="caption" style={{ flex: 1 }} numberOfLines={1}>
+                {folder.label}
+              </ThemedText>
+              <TouchableOpacity onPress={() => deleteScanFolder(folder.uri)} disabled={busy}>
+                <Ionicons name="trash-outline" size={16} color={colors.error} />
+              </TouchableOpacity>
+            </View>
+          ))}
         </ThemedView>
 
         <ThemedView card style={styles.section}>
@@ -158,5 +239,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  folderRow: {
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
 });
-

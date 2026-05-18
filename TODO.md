@@ -15,8 +15,13 @@
 - [x] Storage abstraction implemented (`local`/`r2`) and integrated into share/view/cleanup flows.
 - [x] `backend/.env.example` expanded with DB/storage/LLM env docs.
 - [x] Markdown preview style pass in editor: highlight marker color, explicit bold/italic/link style, and monospace code rendering.
+- [x] Added Home split view `Library | Device` (MVP).
+- [x] Added scan-folder management in Settings and Android SAF markdown scanning utility.
+- [x] Added Device-tab action to import scanned markdown into Library.
 
 ## Next Fixes (High Priority)
+- [ ] Define and implement backend upload-only endpoint if product requires “import => cloud upload immediately” without generating a share link.
+- [ ] Persist Device scan index for larger folder sets (current MVP scans on demand).
 - [ ] Verify on-device that italic text uses desired Grotesk variant; current app bundle loads Regular/Medium/Bold only (no explicit italic font file).
 - [ ] Remove invalid non-env line from `backend/.env` (`Continue Codex at ...`).
 - [ ] Expand `mobile/.env.example` to document production URL usage and the build-time binding behavior of `EXPO_PUBLIC_API_URL`.

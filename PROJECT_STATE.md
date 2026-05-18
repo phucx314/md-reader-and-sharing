@@ -14,6 +14,8 @@ Ship a mobile markdown reader/editor with:
 - Backend: JWT auth (7-day tokens), share link CRUD with batch operations, background cleanup task (hourly), provider-based storage (`local`/`r2`), Postgres-ready DB URL support.
 - LLM: pluggable provider system (`openai`/`anthropic`/`gemini`) with per-file term caching and daily usage limits.
 - Tests: basic Jest setup with component smoke tests (`mobile/__tests__/`); no API integration tests yet.
+- Home now has `Library` and `Device` sub views (MVP split).
+- Device scan support added (Android SAF folder selection + markdown scan utility + Settings management).
 - Agent memory files: `CLAUDE.md`, `AGENTS.md`, `DECISIONS.md`, `PROJECT_STATE.md`, `TODO.md` for cross-agent context sharing.
 - Empty directories: `.agents/`, `.codex/`, `mobile/.agents/`, `mobile/.codex/` (scaffolding for agent integration), `mobile/src/types/` (no type definitions extracted yet).
 
@@ -36,6 +38,9 @@ Ship a mobile markdown reader/editor with:
 - `mobile/src/constants/` is sparse (only `theme.ts`); other config constants (API URL, limits) are hardcoded or inline.
 
 ## Recent Changes
+- 2026-05-18: Added `implement plans/11-20260518-library-device-scan-split-plan.vi.md`.
+- 2026-05-18: Implemented Home `Library | Device` switch and Device-file import to Library.
+- 2026-05-18: Added `mobile/src/utils/deviceScan.ts` and Settings actions for scan folders/rescan.
 - 2026-05-18: Added `backend/seed_test_users.py` for non-destructive test-user upsert seeding (bypasses API payload validation by writing hashed passwords directly at DB layer).
 - 2026-05-18: Home FAB press interaction now uses animated press-in/press-out transitions (matching `BrutalButton` feel): smooth translate + shadow fade instead of boolean jump.
 - 2026-05-18: Markdown preview rendering updated in `EditorScreen`:
