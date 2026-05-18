@@ -85,7 +85,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [importUrlModalVisible, setImportUrlModalVisible] = useState(false);
   const [importUrlInput, setImportUrlInput] = useState('');
   const [importingUrl, setImportingUrl] = useState(false);
-  const [isFabPressed, setIsFabPressed] = useState(false);
+  const fabPressedAnim = React.useRef(new Animated.Value(0)).current;
+
+  const handleFabPressIn = () => {
+    Animated.timing(fabPressedAnim, {
+      toValue: 1,
+      duration: 60,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleFabPressOut = () => {
+    Animated.timing(fabPressedAnim, {
+      toValue: 0,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const toggleFab = () => {
     const toValue = isFabOpen ? 0 : 1;
@@ -583,14 +599,35 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <Pressable
           style={styles.mainFabWrap}
           onPress={toggleFab}
-          onPressIn={() => setIsFabPressed(true)}
-          onPressOut={() => setIsFabPressed(false)}
+          onPressIn={handleFabPressIn}
+          onPressOut={handleFabPressOut}
         >
-          <View style={[styles.fabShadow, { backgroundColor: colors.shadow }]} />
+          <Animated.View
+            style={[
+              styles.fabShadow,
+              {
+                backgroundColor: colors.shadow,
+                opacity: fabPressedAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0],
+                }),
+              },
+            ]}
+          />
           <Animated.View style={[styles.fab, { backgroundColor: colors.primary, borderColor: colors.border }, {
             transform: [
-              { translateX: isFabPressed ? 3 : 0 },
-              { translateY: isFabPressed ? 3 : 0 },
+              {
+                translateX: fabPressedAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 3],
+                }),
+              },
+              {
+                translateY: fabPressedAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 3],
+                }),
+              },
               { rotate: fabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) },
             ],
           }]}>

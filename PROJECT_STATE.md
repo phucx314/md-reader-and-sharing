@@ -36,6 +36,7 @@ Ship a mobile markdown reader/editor with:
 - `mobile/src/constants/` is sparse (only `theme.ts`); other config constants (API URL, limits) are hardcoded or inline.
 
 ## Recent Changes
+- 2026-05-18: Home FAB press interaction now uses animated press-in/press-out transitions (matching `BrutalButton` feel): smooth translate + shadow fade instead of boolean jump.
 - 2026-05-18: Markdown preview rendering updated in `EditorScreen`:
   - `==highlight==` now rendered by custom text rule with yellow background (no HTML tag dependency).
   - Bold/italic/link styles explicitly set in markdown styles.
