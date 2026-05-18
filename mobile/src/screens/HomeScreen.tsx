@@ -17,6 +17,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { syncFilesWithFS, deleteFile as deleteFileFromStore } from '../utils/fileStore';
@@ -600,126 +601,109 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       ) : null}
 
-      <View style={[styles.pageSwitchRow, { borderBottomColor: colors.border }]}>
-        <View style={[styles.pageSwitch, { borderColor: colors.border, backgroundColor: colors.card }]}>
-          <TouchableOpacity
-            style={[styles.pageSwitchBtn, activePage === 'library' && { backgroundColor: colors.primary }]}
-            onPress={() => setActivePage('library')}
-          >
-            <ThemedText type="caption" style={{ fontFamily: 'SpaceGrotesk-Bold', color: activePage === 'library' ? '#111' : colors.text }}>Library</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.pageSwitchBtn, activePage === 'device' && { backgroundColor: colors.primary }]}
-            onPress={() => setActivePage('device')}
-          >
-            <ThemedText type="caption" style={{ fontFamily: 'SpaceGrotesk-Bold', color: activePage === 'device' ? '#111' : colors.text }}>Device</ThemedText>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {activePage === 'library' && (
         <>
-      {/* ─── File list ────────────────────────────── */}
-      <View style={[styles.legendRow, { borderBottomColor: colors.border }]}>
-        <View style={styles.legendItem}>
-          <Ionicons name="download-outline" size={13} color={isDark ? '#9AE6B4' : '#166534'} />
-          <ThemedText type="caption" muted>Imported</ThemedText>
-        </View>
-        <View style={styles.legendItem}>
-          <Ionicons name="cloud-done-outline" size={13} color={colors.textMuted} />
-          <ThemedText type="caption" muted>Cloud saved</ThemedText>
-        </View>
-        <View style={styles.legendItem}>
-          <Ionicons name="share-social-outline" size={13} color={colors.success} />
-          <ThemedText type="caption" muted>Active Link</ThemedText>
-        </View>
-      </View>
+          {/* ─── File list ────────────────────────────── */}
+          <View style={[styles.legendRow, { borderBottomColor: colors.border }]}>
+            <View style={styles.legendItem}>
+              <Ionicons name="download-outline" size={13} color={isDark ? '#9AE6B4' : '#166534'} />
+              <ThemedText type="caption" muted>Imported</ThemedText>
+            </View>
+            <View style={styles.legendItem}>
+              <Ionicons name="cloud-done-outline" size={13} color={colors.textMuted} />
+              <ThemedText type="caption" muted>Cloud saved</ThemedText>
+            </View>
+            <View style={styles.legendItem}>
+              <Ionicons name="share-social-outline" size={13} color={colors.success} />
+              <ThemedText type="caption" muted>Active Link</ThemedText>
+            </View>
+          </View>
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.uri}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={['#111']}
-            progressBackgroundColor={colors.primary}
-          />
-        }
-        contentContainerStyle={[styles.list, files.length === 0 && styles.listEmpty]}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyState}>
-            <ThemedText style={[styles.emptyEmoji]}>📄</ThemedText>
-            <ThemedText type="subtitle" style={{ marginBottom: 8 }}>No files yet</ThemedText>
-            <ThemedText muted style={{ textAlign: 'center' }}>
-              Tap the + button to create{'\n'}or import a markdown file.
-            </ThemedText>
-          </View>
-        )}
-        renderSectionHeader={({ section: { title } }) => (
-          <View style={styles.sectionHeader}>
-            <ThemedText type="label" style={{ fontFamily: 'SpaceGrotesk-Bold', color: colors.text }}>{title}</ThemedText>
-          </View>
-        )}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('Editor', { uri: item.uri, name: item.name, fileId: item.id })}
-          >
-            <ThemedView card style={styles.fileCard}>
-              {/* File icon badge */}
-              <View style={[styles.fileIconBadge, { backgroundColor: colors.primary, borderColor: colors.border }]}>
-                <Ionicons name="document-text" size={20} color="#111" />
+          <SectionList
+            sections={sections}
+            keyExtractor={(item) => item.uri}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.primary}
+                colors={['#111']}
+                progressBackgroundColor={colors.primary}
+              />
+            }
+            contentContainerStyle={[styles.list, files.length === 0 && styles.listEmpty]}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyState}>
+                <ThemedText style={[styles.emptyEmoji]}>📄</ThemedText>
+                <ThemedText type="subtitle" style={{ marginBottom: 8 }}>No files yet</ThemedText>
+                <ThemedText muted style={{ textAlign: 'center' }}>
+                  Tap the + button to create{'\n'}or import a markdown file.
+                </ThemedText>
               </View>
+            )}
+            renderSectionHeader={({ section: { title } }) => (
+              <View style={styles.sectionHeader}>
+                <ThemedText type="label" style={{ fontFamily: 'SpaceGrotesk-Bold', color: colors.text }}>{title}</ThemedText>
+              </View>
+            )}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('Editor', { uri: item.uri, name: item.name, fileId: item.id })}
+              >
+                <ThemedView card style={styles.fileCard}>
+                  {/* File icon badge */}
+                  <View style={[styles.fileIconBadge, { backgroundColor: colors.primary, borderColor: colors.border }]}>
+                    <Ionicons name="document-text" size={20} color="#111" />
+                  </View>
 
-              <View style={styles.fileDetails}>
-                <View style={styles.fileTitleRow}>
-                  <ThemedText type="label" numberOfLines={1} style={{ flex: 1 }}>
-                    {item.name.replace('.md', '')}
-                  </ThemedText>
-                </View>
-                {(() => {
-                  const shareState = item.id ? shareStatusMap[item.id] : undefined;
-                  const wasEverShared = Boolean(shareState?.ever_shared);
-                  const isActiveShared = Boolean(shareState?.active_shared);
-                  const isImported = item.origin === 'imported';
-                  return (
-                    <View style={styles.metaRow}>
-                      <ThemedText type="caption" muted>
-                        {(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}
+                  <View style={styles.fileDetails}>
+                    <View style={styles.fileTitleRow}>
+                      <ThemedText type="label" numberOfLines={1} style={{ flex: 1 }}>
+                        {item.name.replace('.md', '')}
                       </ThemedText>
-                      <View style={styles.metaIconsRow}>
-                        {isImported ? (
-                          <Ionicons name="download-outline" size={14} color={isDark ? '#9AE6B4' : '#166534'} />
-                        ) : null}
-                        {wasEverShared ? (
-                          <Ionicons name="cloud-done-outline" size={14} color={colors.textMuted} />
-                        ) : null}
-                        {isActiveShared ? (
-                          <Ionicons name="share-social-outline" size={14} color={colors.success} />
-                        ) : null}
-                      </View>
                     </View>
-                  );
-                })()}
-              </View>
+                    {(() => {
+                      const shareState = item.id ? shareStatusMap[item.id] : undefined;
+                      const wasEverShared = Boolean(shareState?.ever_shared);
+                      const isActiveShared = Boolean(shareState?.active_shared);
+                      const isImported = item.origin === 'imported';
+                      return (
+                        <View style={styles.metaRow}>
+                          <ThemedText type="caption" muted>
+                            {(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}
+                          </ThemedText>
+                          <View style={styles.metaIconsRow}>
+                            {isImported ? (
+                              <Ionicons name="download-outline" size={14} color={isDark ? '#9AE6B4' : '#166534'} />
+                            ) : null}
+                            {wasEverShared ? (
+                              <Ionicons name="cloud-done-outline" size={14} color={colors.textMuted} />
+                            ) : null}
+                            {isActiveShared ? (
+                              <Ionicons name="share-social-outline" size={14} color={colors.success} />
+                            ) : null}
+                          </View>
+                        </View>
+                      );
+                    })()}
+                  </View>
 
-              <View style={[styles.fileActions, { marginLeft: 'auto' }]}>
-                <TouchableOpacity
-                  onPress={() => confirmDelete(item.id, item.uri, item.name)}
-                  style={[styles.deleteButton, { borderColor: colors.border }]}
-                  accessibilityLabel={`Delete ${item.name}`}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="trash-outline" size={18} color={colors.error} />
-                </TouchableOpacity>
-              </View>
-            </ThemedView>
-          </TouchableOpacity>
-        )}
-      />
-      </>
+                  <View style={[styles.fileActions, { marginLeft: 'auto' }]}>
+                    <TouchableOpacity
+                      onPress={() => confirmDelete(item.id, item.uri, item.name)}
+                      style={[styles.deleteButton, { borderColor: colors.border }]}
+                      accessibilityLabel={`Delete ${item.name}`}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                </ThemedView>
+              </TouchableOpacity>
+            )}
+          />
+        </>
       )}
 
       {activePage === 'device' && (
@@ -850,6 +834,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </Pressable>
       </View>}
 
+      <View style={[styles.bottomSwitchIsland, { borderColor: colors.border, backgroundColor: colors.card }]}>
+        <TouchableOpacity
+          style={[styles.bottomSwitchBtn, activePage === 'library' && { backgroundColor: colors.primary }]}
+          onPress={() => setActivePage('library')}
+        >
+          <ThemedText type="caption" style={{ fontFamily: 'SpaceGrotesk-Bold', color: activePage === 'library' ? '#111' : colors.text }}>
+            Library
+          </ThemedText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.bottomSwitchBtn, activePage === 'device' && { backgroundColor: colors.primary }]}
+          onPress={() => setActivePage('device')}
+        >
+          <ThemedText type="caption" style={{ fontFamily: 'SpaceGrotesk-Bold', color: activePage === 'device' ? '#111' : colors.text }}>
+            Device
+          </ThemedText>
+        </TouchableOpacity>
+      </View>
+
       {/* ─── Modals ──────────────────────── */}
       <Modal visible={profileMenuVisible} transparent animationType="fade">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setProfileMenuVisible(false)}>
@@ -930,6 +933,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(0,0,0,0)', `${colors.background}99`, `${colors.background}FA`, colors.background]}
+        locations={[0, 0.35, 0.75, 1]}
+        style={styles.bottomFadeWrap}
+      />
     </SafeAreaView>
   );
 };
@@ -964,21 +974,6 @@ const styles = StyleSheet.create({
     width: 160,
     height: 2,
   },
-  pageSwitchRow: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-  },
-  pageSwitch: {
-    borderWidth: 2,
-    flexDirection: 'row',
-    alignSelf: 'flex-start',
-  },
-  pageSwitchBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -992,7 +987,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  list: { padding: 16, paddingBottom: 100 },
+  list: { padding: 16, paddingBottom: 170 },
   listEmpty: { flex: 1 },
   sectionHeader: {
     paddingVertical: 10,
@@ -1069,7 +1064,7 @@ const styles = StyleSheet.create({
   // FAB container holds both shadow and button
   fabContainer: {
     position: 'absolute',
-    bottom: 28,
+    bottom: 98,
     right: 28,
     width: 60,
     height: 60,
@@ -1178,5 +1173,32 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bottomSwitchIsland: {
+    position: 'absolute',
+    left: 28,
+    right: 28,
+    bottom: 28,
+    height: 52,
+    borderWidth: 2,
+    borderRadius: 26,
+    padding: 4,
+    flexDirection: 'row',
+    gap: 4,
+    zIndex: 3,
+  },
+  bottomSwitchBtn: {
+    flex: 1,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomFadeWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 140,
+    zIndex: 1,
   },
 });
