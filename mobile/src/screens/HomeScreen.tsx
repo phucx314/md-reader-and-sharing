@@ -800,18 +800,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           onPressIn={handleFabPressIn}
           onPressOut={handleFabPressOut}
         >
-          <Animated.View
-            style={[
-              styles.fabShadow,
-              {
-                backgroundColor: colors.shadow,
-                opacity: fabPressedAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 0],
-                }),
-              },
-            ]}
-          />
           <Animated.View style={[styles.fab, { backgroundColor: colors.primary, borderColor: colors.border }, {
             transform: [
               {
@@ -1064,12 +1052,13 @@ const styles = StyleSheet.create({
   // FAB container holds both shadow and button
   fabContainer: {
     position: 'absolute',
-    bottom: 98,
+    bottom: 28,
     right: 28,
     width: 60,
     height: 60,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 4,
   },
   mainFabWrap: {
     position: 'absolute',
@@ -1080,15 +1069,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 6,
     alignItems: 'flex-end',
-  },
-  fabShadow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    transform: [{ translateX: 4 }, { translateY: 4 }],
   },
   fab: {
     position: 'absolute',
@@ -1177,11 +1157,11 @@ const styles = StyleSheet.create({
   bottomSwitchIsland: {
     position: 'absolute',
     left: 28,
-    right: 28,
+    right: 96,
     bottom: 28,
-    height: 52,
+    height: 60,
     borderWidth: 2,
-    borderRadius: 26,
+    borderRadius: 30,
     padding: 4,
     flexDirection: 'row',
     gap: 4,
@@ -1189,7 +1169,7 @@ const styles = StyleSheet.create({
   },
   bottomSwitchBtn: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },
