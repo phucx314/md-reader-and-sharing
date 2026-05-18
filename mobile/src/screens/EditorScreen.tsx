@@ -484,6 +484,8 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({ navigation, route })
         message="You have unsaved changes. Do you want to save or discard them?"
         cancelText="Discard"
         confirmText="Save"
+        cancelVariant="danger"
+        confirmVariant="primary"
         onCancel={() => {
           setDiscardModalVisible(false);
           setIsDirty(false);

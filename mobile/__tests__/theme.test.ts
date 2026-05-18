@@ -48,8 +48,8 @@ describe('Theme constants', () => {
       expect(darkTheme.primary).toBe('#FACC15');
     });
 
-    it('has cream border color for dark mode', () => {
-      expect(darkTheme.border).toBe('#F5F0E8');
+    it('has low-contrast dark border color for dark mode', () => {
+      expect(darkTheme.border).toBe('#3A3A3A');
     });
 
     it('has dark card background', () => {

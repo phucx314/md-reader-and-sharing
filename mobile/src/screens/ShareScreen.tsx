@@ -52,7 +52,14 @@ const formatExpiryDate = (dateString: string | null) => {
   if (!dateString) return 'Never';
   const date = parseDate(dateString);
   if (!date) return 'Unknown';
-  return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 };
 
 const isExpired = (expiresAt: string | null) => {

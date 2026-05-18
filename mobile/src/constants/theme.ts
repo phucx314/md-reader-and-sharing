@@ -20,11 +20,10 @@ export const darkTheme = {
   primary: '#FACC15',
   accent: '#00C2CB',
   success: '#00C853',
-  border: '#F5F0E8',
+  border: '#3A3A3A',       // low-contrast dark border to avoid bright outlines on dark bg
   card: '#2C2C2C',
   shadow: 'transparent',   // remove drop shadows entirely in dark mode
   error: '#FF453A',
 };
 
 export type ThemeColors = typeof lightTheme;
-

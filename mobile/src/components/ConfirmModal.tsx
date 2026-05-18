@@ -14,6 +14,8 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   neutralText?: string;
+  confirmVariant?: 'danger' | 'primary' | 'neutral';
+  cancelVariant?: 'danger' | 'primary' | 'neutral';
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -27,8 +29,23 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   neutralText,
+  confirmVariant = 'danger',
+  cancelVariant = 'neutral',
 }) => {
   const { colors, isDark } = useTheme();
+
+  const getButtonStyle = (variant: 'danger' | 'primary' | 'neutral') => {
+    if (variant === 'danger') {
+      return { backgroundColor: colors.error, borderColor: colors.border, textColor: '#FFFFFF' };
+    }
+    if (variant === 'primary') {
+      return { backgroundColor: colors.primary, borderColor: colors.border, textColor: '#111111' };
+    }
+    return { backgroundColor: colors.background, borderColor: colors.border, textColor: colors.text };
+  };
+
+  const cancelBtn = getButtonStyle(cancelVariant);
+  const confirmBtn = getButtonStyle(confirmVariant);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss || onCancel}>
@@ -40,10 +57,10 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
             <View style={styles.actions}>
               <TouchableOpacity
-                style={[styles.button, { backgroundColor: colors.background, borderColor: colors.border }]}
+                style={[styles.button, { backgroundColor: cancelBtn.backgroundColor, borderColor: cancelBtn.borderColor }]}
                 onPress={onCancel}
               >
-                <ThemedText style={styles.buttonText}>{cancelText}</ThemedText>
+                <ThemedText style={[styles.buttonText, { color: cancelBtn.textColor }]}>{cancelText}</ThemedText>
               </TouchableOpacity>
               
               {onNeutral && (
@@ -56,10 +73,10 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               )}
               
               <TouchableOpacity
-                style={[styles.button, { backgroundColor: colors.error, borderColor: colors.border }]}
+                style={[styles.button, { backgroundColor: confirmBtn.backgroundColor, borderColor: confirmBtn.borderColor }]}
                 onPress={onConfirm}
               >
-                <ThemedText style={[styles.buttonText, { color: '#FFF' }]}>{confirmText}</ThemedText>
+                <ThemedText style={[styles.buttonText, { color: confirmBtn.textColor }]}>{confirmText}</ThemedText>
               </TouchableOpacity>
             </View>
           </View>
