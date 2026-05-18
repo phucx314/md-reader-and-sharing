@@ -17,6 +17,8 @@ import {
   pickAndAddScanFolder,
   removeScanFolder,
   scanMarkdownFiles,
+  getScanRecursiveAll,
+  setScanRecursiveAll,
   type ScanFolder,
 } from '../utils/deviceScan';
 
@@ -26,6 +28,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   const { colors, isDark, toggleTheme } = useTheme();
   const [busy, setBusy] = useState(false);
   const [scanFolders, setScanFolders] = useState<ScanFolder[]>([]);
+  const [scanRecursiveAll, setScanRecursiveAllState] = useState(true);
 
   const backendHost = useMemo(() => {
     try {
@@ -62,6 +65,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   const loadScanFolders = async () => {
     const folders = await getScanFolders();
     setScanFolders(folders);
+    setScanRecursiveAllState(await getScanRecursiveAll());
   };
 
   React.useEffect(() => {
@@ -104,6 +108,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
     } finally {
       setBusy(false);
     }
+  };
+
+  const toggleScanAll = async (next: boolean) => {
+    setScanRecursiveAllState(next);
+    await setScanRecursiveAll(next);
   };
 
   return (
@@ -166,6 +175,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
             <Ionicons name="scan-outline" size={18} color={colors.text} />
             <ThemedText type="label">Rescan Device Markdown</ThemedText>
           </TouchableOpacity>
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="label">Scan All Subfolders</ThemedText>
+              <ThemedText type="caption" muted>Recursive scan inside selected folder roots.</ThemedText>
+            </View>
+            <BrutalSwitch value={scanRecursiveAll} onValueChange={toggleScanAll} />
+          </View>
           {scanFolders.map((folder) => (
             <View key={folder.uri} style={[styles.folderRow, { borderColor: colors.border }]}>
               <ThemedText type="caption" style={{ flex: 1 }} numberOfLines={1}>

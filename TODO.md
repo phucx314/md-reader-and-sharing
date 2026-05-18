@@ -18,8 +18,10 @@
 - [x] Added Home split view `Library | Device` (MVP).
 - [x] Added scan-folder management in Settings and Android SAF markdown scanning utility.
 - [x] Added Device-tab action to import scanned markdown into Library.
+- [x] Fixed scanned-file import path for Android SAF (`content://`) reads.
 
 ## Next Fixes (High Priority)
+- [ ] Add user-facing warning/help text for SAF-restricted folders (Android scoped storage limitation).
 - [ ] Define and implement backend upload-only endpoint if product requires “import => cloud upload immediately” without generating a share link.
 - [ ] Persist Device scan index for larger folder sets (current MVP scans on demand).
 - [ ] Verify on-device that italic text uses desired Grotesk variant; current app bundle loads Regular/Medium/Bold only (no explicit italic font file).

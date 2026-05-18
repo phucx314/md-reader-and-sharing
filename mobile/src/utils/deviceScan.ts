@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 
 const SCAN_FOLDERS_KEY = '@device_scan_folders_v1';
+const SCAN_RECURSIVE_KEY = '@device_scan_recursive_all_v1';
 
 export type ScanFolder = {
   uri: string;
@@ -23,6 +24,14 @@ const getFolderLabelFromUri = (uri: string) => {
   return decodeURIComponent(parts[parts.length - 1] || 'Folder');
 };
 
+const getDisplayNameFromEntryUri = (entryUri: string) => {
+  const decoded = decodeURIComponent(entryUri);
+  const rawTail = decoded.split('/').pop() || '';
+  const afterColon = rawTail.includes(':') ? rawTail.split(':').slice(1).join(':') : rawTail;
+  const normalized = afterColon.replace(/\\/g, '/');
+  return normalized.split('/').pop() || afterColon || rawTail || 'unknown.md';
+};
+
 export const getScanFolders = async (): Promise<ScanFolder[]> => {
   try {
     const raw = await AsyncStorage.getItem(SCAN_FOLDERS_KEY);
@@ -35,6 +44,20 @@ export const getScanFolders = async (): Promise<ScanFolder[]> => {
 
 export const saveScanFolders = async (folders: ScanFolder[]) => {
   await AsyncStorage.setItem(SCAN_FOLDERS_KEY, JSON.stringify(folders));
+};
+
+export const getScanRecursiveAll = async (): Promise<boolean> => {
+  try {
+    const raw = await AsyncStorage.getItem(SCAN_RECURSIVE_KEY);
+    if (raw == null) return true;
+    return raw === '1';
+  } catch {
+    return true;
+  }
+};
+
+export const setScanRecursiveAll = async (enabled: boolean) => {
+  await AsyncStorage.setItem(SCAN_RECURSIVE_KEY, enabled ? '1' : '0');
 };
 
 export const pickAndAddScanFolder = async (): Promise<ScanFolder | null> => {
@@ -62,28 +85,43 @@ export const removeScanFolder = async (uri: string) => {
 
 export const scanMarkdownFiles = async (): Promise<DeviceMarkdownFile[]> => {
   const folders = await getScanFolders();
+  const recursiveAll = await getScanRecursiveAll();
   const all: DeviceMarkdownFile[] = [];
+  console.log('[DeviceScan] start scan folders:', folders.map((f) => ({ label: f.label, uri: f.uri })), 'recursiveAll=', recursiveAll);
+
+  const walk = async (folder: ScanFolder, dirUri: string, depth: number): Promise<void> => {
+    const entries = await FileSystem.StorageAccessFramework.readDirectoryAsync(dirUri);
+    console.log(`[DeviceScan] folder=${folder.label} depth=${depth} entries=${entries.length}`);
+    for (const entryUri of entries) {
+      const info = await FileSystem.getInfoAsync(entryUri);
+      const name = getDisplayNameFromEntryUri(entryUri);
+      if ((info as any).isDirectory) {
+        if (recursiveAll) {
+          await walk(folder, entryUri, depth + 1);
+        }
+        continue;
+      }
+      if (!name.toLowerCase().endsWith('.md')) continue;
+      all.push({
+        uri: entryUri,
+        name,
+        parentUri: folder.uri,
+        parentLabel: folder.label,
+        size: info.exists ? ((info as any).size ?? 0) : 0,
+        mtime: info.exists ? ((info as any).modificationTime ?? Date.now() / 1000) : Date.now() / 1000,
+      });
+    }
+  };
 
   for (const folder of folders) {
     try {
-      const entries = await FileSystem.StorageAccessFramework.readDirectoryAsync(folder.uri);
-      for (const entryUri of entries) {
-        const name = decodeURIComponent(entryUri.split('/').pop() || '');
-        if (!name.toLowerCase().endsWith('.md')) continue;
-        const info = await FileSystem.getInfoAsync(entryUri);
-        all.push({
-          uri: entryUri,
-          name,
-          parentUri: folder.uri,
-          parentLabel: folder.label,
-          size: info.exists ? ((info as any).size ?? 0) : 0,
-          mtime: info.exists ? ((info as any).modificationTime ?? Date.now() / 1000) : Date.now() / 1000,
-        });
-      }
-    } catch {
+      await walk(folder, folder.uri, 0);
+    } catch (error) {
+      console.error('[DeviceScan] scan folder failed', { folder, error });
       continue;
     }
   }
 
+  console.log(`[DeviceScan] total markdown files=${all.length}`);
   return all;
 };

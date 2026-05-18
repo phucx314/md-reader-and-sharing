@@ -38,6 +38,9 @@ Ship a mobile markdown reader/editor with:
 - `mobile/src/constants/` is sparse (only `theme.ts`); other config constants (API URL, limits) are hardcoded or inline.
 
 ## Recent Changes
+- 2026-05-18: Device scan now supports recursive “scan all subfolders” toggle from Settings.
+- 2026-05-18: Fixed scanned filename normalization (SAF document IDs no longer leak full path into local filename), preventing import write failures.
+- 2026-05-18: Fixed Device->Library import for scanned files by using SAF read API for `content://` URIs and ensuring library directory creation before write.
 - 2026-05-18: Added `implement plans/11-20260518-library-device-scan-split-plan.vi.md`.
 - 2026-05-18: Implemented Home `Library | Device` switch and Device-file import to Library.
 - 2026-05-18: Added `mobile/src/utils/deviceScan.ts` and Settings actions for scan folders/rescan.

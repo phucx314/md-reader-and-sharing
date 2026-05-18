@@ -65,6 +65,15 @@ const formatTime = (ts: number) => {
   }
 };
 
+const toSafeLocalMdFilename = (raw: string) => {
+  const trimmed = String(raw || '').trim();
+  const base = trimmed.replace(/\\/g, '/').split('/').pop() || 'imported.md';
+  const noDocPrefix = base.includes(':') ? base.split(':').slice(1).join(':') : base;
+  const sanitized = noDocPrefix.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+  const finalName = sanitized || 'imported.md';
+  return finalName.toLowerCase().endsWith('.md') ? finalName : `${finalName}.md`;
+};
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [activePage, setActivePage] = useState<'library' | 'device'>('library');
   const [files, setFiles] = useState<FileInfo[]>([]);
@@ -420,13 +429,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const importScannedFile = async (item: DeviceMarkdownFile) => {
     try {
-      const body = await FileSystem.readAsStringAsync(item.uri);
+      console.log('[DeviceImport] start', {
+        uri: item.uri,
+        name: item.name,
+        parentLabel: item.parentLabel,
+        isContentUri: item.uri.startsWith('content://'),
+      });
+      const body = item.uri.startsWith('content://')
+        ? await FileSystem.StorageAccessFramework.readAsStringAsync(item.uri)
+        : await FileSystem.readAsStringAsync(item.uri);
+      console.log('[DeviceImport] read done', { length: body.length });
       if (!body.trim()) {
         Toast.show({ position: 'bottom', type: 'error', text1: 'File is empty' });
         return;
       }
 
-      let finalFilename = item.name.endsWith('.md') ? item.name : `${item.name}.md`;
+      const dirInfo = await FileSystem.getInfoAsync(DIR_URI);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(DIR_URI, { intermediates: true });
+      }
+
+      let finalFilename = toSafeLocalMdFilename(item.name);
       let counter = 1;
       while (await getFileByName(finalFilename)) {
         const stem = item.name.replace(/\.md$/i, '');
@@ -435,6 +458,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       }
 
       const newUri = `${DIR_URI}${finalFilename}`;
+      console.log('[DeviceImport] write target', { newUri, finalFilename });
       await FileSystem.writeAsStringAsync(newUri, body);
       const newFileId = generateUUID();
       await saveFile({
@@ -445,8 +469,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         origin: 'local',
       });
       await loadFiles();
+      console.log('[DeviceImport] success', { newFileId, finalFilename });
       Toast.show({ position: 'bottom', type: 'success', text1: 'Imported to Library' });
-    } catch {
+    } catch (error: any) {
+      console.error('[DeviceImport] failed', {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack,
+        error,
+      });
       Toast.show({ position: 'bottom', type: 'error', text1: 'Import failed' });
     }
   };
