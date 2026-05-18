@@ -337,6 +337,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       }
 
       await loadFiles();
+      setActivePage('library');
       Toast.show({
         position: 'bottom',
         type: 'success',
@@ -435,6 +436,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setImportUrlModalVisible(false);
       setImportUrlInput('');
       await loadFiles();
+      setActivePage('library');
       Toast.show({ position: 'bottom', type: 'success', text1: 'Imported from URL' });
       navigation.navigate('Editor', { uri: newUri, name: finalFilename, fileId: newFileId });
     } catch (error: any) {
@@ -496,6 +498,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         origin: 'local',
       });
       await loadFiles();
+      setActivePage('library');
       console.log('[DeviceImport] success', { newFileId, finalFilename });
       Toast.show({ position: 'bottom', type: 'success', text1: 'Imported to Library' });
     } catch (error: any) {
@@ -756,7 +759,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       )}
 
       {/* ─── Expandable FAB ──────────────────────── */}
-      {activePage === 'library' && <View style={styles.fabContainer}>
+      <View style={styles.fabContainer}>
         {/* Import Link Button */}
         <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -195] }) }, { scale: fabAnim }] }]}>
           <TouchableOpacity onPress={() => { closeFab(); setImportUrlModalVisible(true); }} activeOpacity={0.85}>
@@ -820,7 +823,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Ionicons name="add" size={30} color="#111" />
           </Animated.View>
         </Pressable>
-      </View>}
+      </View>
 
       <View style={[styles.bottomSwitchIsland, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <TouchableOpacity
