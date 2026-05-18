@@ -80,6 +80,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [sections, setSections] = useState<{ title: string; data: FileInfo[] }[]>([]);
   const [deviceFiles, setDeviceFiles] = useState<DeviceMarkdownFile[]>([]);
   const [deviceSections, setDeviceSections] = useState<{ title: string; data: DeviceMarkdownFile[] }[]>([]);
+  const [isScanningDevice, setIsScanningDevice] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [shareStatusMap, setShareStatusMap] = useState<Record<string, { ever_shared: boolean; active_shared: boolean }>>({});
   const { colors, isDark, toggleTheme } = useTheme();
@@ -87,6 +88,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const [isFabOpen, setIsFabOpen] = useState(false);
   const fabAnim = React.useRef(new Animated.Value(0)).current;
+  const scanBarAnim = React.useRef(new Animated.Value(0)).current;
   const subFabExtendedAnim = React.useRef(new Animated.Value(1)).current;
   const subFabTimer = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -155,6 +157,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   const loadDeviceFiles = async () => {
+    setIsScanningDevice(true);
     try {
       const scanned = await scanMarkdownFiles();
       setDeviceFiles(scanned);
@@ -174,8 +177,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       console.error(e);
       setDeviceFiles([]);
       setDeviceSections([]);
+    } finally {
+      setIsScanningDevice(false);
     }
   };
+
+  React.useEffect(() => {
+    if (!isScanningDevice) {
+      scanBarAnim.stopAnimation();
+      scanBarAnim.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(scanBarAnim, {
+        toValue: 1,
+        duration: 900,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+      scanBarAnim.stopAnimation();
+      scanBarAnim.setValue(0);
+    };
+  }, [isScanningDevice, scanBarAnim]);
 
   const loadFiles = async () => {
     try {
@@ -553,6 +579,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
+      {isScanningDevice ? (
+        <View style={[styles.scanProgressTrack, { backgroundColor: isDark ? '#2A2A2A' : '#E5E7EB' }]}>
+          <Animated.View
+            style={[
+              styles.scanProgressBar,
+              {
+                backgroundColor: colors.primary,
+                transform: [
+                  {
+                    translateX: scanBarAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-160, 420],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+        </View>
+      ) : null}
 
       <View style={[styles.pageSwitchRow, { borderBottomColor: colors.border }]}>
         <View style={[styles.pageSwitch, { borderColor: colors.border, backgroundColor: colors.card }]}>
@@ -910,6 +956,14 @@ const styles = StyleSheet.create({
   },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
   iconButton: { marginLeft: 8, padding: 6 },
+  scanProgressTrack: {
+    height: 2,
+    overflow: 'hidden',
+  },
+  scanProgressBar: {
+    width: 160,
+    height: 2,
+  },
   pageSwitchRow: {
     paddingHorizontal: 16,
     paddingTop: 10,

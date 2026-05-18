@@ -49,10 +49,10 @@ export const saveScanFolders = async (folders: ScanFolder[]) => {
 export const getScanRecursiveAll = async (): Promise<boolean> => {
   try {
     const raw = await AsyncStorage.getItem(SCAN_RECURSIVE_KEY);
-    if (raw == null) return true;
+    if (raw == null) return false;
     return raw === '1';
   } catch {
-    return true;
+    return false;
   }
 };
 
