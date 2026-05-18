@@ -36,6 +36,12 @@ Ship a mobile markdown reader/editor with:
 - `mobile/src/constants/` is sparse (only `theme.ts`); other config constants (API URL, limits) are hardcoded or inline.
 
 ## Recent Changes
+- 2026-05-18: Markdown preview rendering updated in `EditorScreen`:
+  - `==highlight==` now rendered by custom text rule with yellow background (no HTML tag dependency).
+  - Bold/italic/link styles explicitly set in markdown styles.
+  - Code block + inline code switched to monospace font in preview.
+  - Heading-1 spacing/line-height adjusted to reduce clipping around divider.
+  - Space Grotesk package confirmed to have no italic face; italic preview uses Grotesk-preserving skew style to avoid system-font fallback mismatch.
 - 2026-05-17: Added project memory files (`AGENTS.md`, `CLAUDE.md`, `PROJECT_STATE.md`, `TODO.md`, `DECISIONS.md`) for shared agent context.
 - 2026-05-17: Refactored mobile API client to dynamically strip trailing slashes from `EXPO_PUBLIC_API_URL`.
 - 2026-05-17: Configured EAS build (`mobile/eas.json`), updated mobile app metadata, refactored auth to `x-www-form-urlencoded`.

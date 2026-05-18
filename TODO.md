@@ -14,8 +14,10 @@
 - [x] Backend `DATABASE_URL` support with SQLite fallback and Postgres URL normalization.
 - [x] Storage abstraction implemented (`local`/`r2`) and integrated into share/view/cleanup flows.
 - [x] `backend/.env.example` expanded with DB/storage/LLM env docs.
+- [x] Markdown preview style pass in editor: highlight marker color, explicit bold/italic/link style, and monospace code rendering.
 
 ## Next Fixes (High Priority)
+- [ ] Verify on-device that italic text uses desired Grotesk variant; current app bundle loads Regular/Medium/Bold only (no explicit italic font file).
 - [ ] Remove invalid non-env line from `backend/.env` (`Continue Codex at ...`).
 - [ ] Expand `mobile/.env.example` to document production URL usage and the build-time binding behavior of `EXPO_PUBLIC_API_URL`.
 - [ ] Add explicit startup/runtime validation for required mobile env (`EXPO_PUBLIC_API_URL`) with clear error messaging.

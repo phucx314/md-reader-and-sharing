@@ -14,6 +14,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { WebView } from 'react-native-webview';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Markdown from 'react-native-markdown-display';
 
 import { ThemedText } from '../components/ThemedText';
 import { useTheme } from '../context/ThemeContext';
@@ -51,6 +52,9 @@ const escapeHtml = (str: string) =>
 
 const renderInlineMarkdown = (line: string) => {
   let html = escapeHtml(line);
+  // Auto-link plain URLs before markdown link transforms.
+  html = html.replace(/((?:https?:\/\/)[^\s<]+)/g, '<a href="$1">$1</a>');
+  html = html.replace(/==([^=]+)==/g, '<mark>$1</mark>');
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
@@ -207,12 +211,13 @@ const buildExplainHtml = (markdown: string, isDark: boolean) => {
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap');
       html, body {
         margin: 0;
         padding: 0;
         background: ${bg};
         color: ${text};
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-size: 16px;
         line-height: 26px;
         -webkit-user-select: text;
@@ -220,8 +225,10 @@ const buildExplainHtml = (markdown: string, isDark: boolean) => {
       }
       body { padding: 20px; }
       p { margin: 10px 0; white-space: normal; }
-      h1, h2, h3 { margin: 18px 0 10px; line-height: 1.25; }
+      h1, h2, h3 { margin: 18px 0 10px; line-height: 1.35; padding: 2px 0; font-family: "Space Grotesk", sans-serif; font-weight: 700; }
       a { color: ${isDark ? '#FACC15' : '#B45309'}; text-decoration: none; }
+      strong { font-weight: 700; font-family: "Space Grotesk", sans-serif; }
+      mark { background: #FACC15; color: #111111; padding: 0 2px; }
       blockquote {
         margin: 12px 0;
         padding-left: 10px;
@@ -311,6 +318,45 @@ export const ExplainViewerScreen: React.FC<ExplainViewerProps> = ({ navigation, 
   const [modalVisible, setModalVisible] = useState(false);
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const html = useMemo(() => buildExplainHtml(String(content), isDark), [content, isDark]);
+  const modalMarkdownStyles = useMemo(
+    () => ({
+      body: {
+        color: colors.text,
+        fontFamily: 'SpaceGrotesk-Regular',
+        fontSize: 15,
+        lineHeight: 23,
+      },
+      paragraph: {
+        marginTop: 6,
+        marginBottom: 6,
+      },
+      strong: {
+        fontFamily: 'SpaceGrotesk-Bold',
+      },
+      code_inline: {
+        backgroundColor: isDark ? '#333333' : '#F1F1F1',
+        color: colors.text,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+      },
+      fence: {
+        backgroundColor: isDark ? '#242424' : '#F7F7F7',
+        color: colors.text,
+        borderWidth: 1,
+        borderColor: colors.border,
+        padding: 10,
+      },
+      blockquote: {
+        borderLeftWidth: 3,
+        borderLeftColor: isDark ? '#5A5A5A' : '#D4D4D4',
+        paddingLeft: 10,
+      },
+      link: {
+        color: isDark ? '#FACC15' : '#B45309',
+      },
+    }),
+    [colors.border, colors.text, isDark]
+  );
 
   React.useEffect(() => {
     const showPrivacyNotice = async () => {
@@ -431,13 +477,19 @@ export const ExplainViewerScreen: React.FC<ExplainViewerProps> = ({ navigation, 
             </View>
             <ScrollView style={{ maxHeight: 360 }}>
               <ThemedText type="label" style={styles.label}>Meaning</ThemedText>
-              <ThemedText style={styles.resultText}>{result?.meaning}</ThemedText>
+              <Markdown style={modalMarkdownStyles as any}>
+                {String(result?.meaning || '')}
+              </Markdown>
               <ThemedText type="label" style={styles.label}>Explanation</ThemedText>
-              <ThemedText style={styles.resultText}>{result?.explanation}</ThemedText>
+              <Markdown style={modalMarkdownStyles as any}>
+                {String(result?.explanation || '')}
+              </Markdown>
               {result?.example ? (
                 <>
                   <ThemedText type="label" style={styles.label}>Example</ThemedText>
-                  <ThemedText style={styles.resultText}>{result.example}</ThemedText>
+                  <Markdown style={modalMarkdownStyles as any}>
+                    {String(result.example)}
+                  </Markdown>
                 </>
               ) : null}
               <ThemedText type="caption" muted>
