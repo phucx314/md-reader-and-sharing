@@ -15,7 +15,7 @@ export type DeviceMarkdownFile = {
   parentUri: string;
   parentLabel: string;
   size: number;
-  mtime: number;
+  mtime: number | null;
 };
 
 const getFolderLabelFromUri = (uri: string) => {
@@ -108,7 +108,9 @@ export const scanMarkdownFiles = async (): Promise<DeviceMarkdownFile[]> => {
         parentUri: folder.uri,
         parentLabel: folder.label,
         size: info.exists ? ((info as any).size ?? 0) : 0,
-        mtime: info.exists ? ((info as any).modificationTime ?? Date.now() / 1000) : Date.now() / 1000,
+        mtime: info.exists
+          ? (((info as any).modificationTime ?? (info as any).mtime ?? (info as any).lastModified ?? null) as number | null)
+          : null,
       });
     }
   };

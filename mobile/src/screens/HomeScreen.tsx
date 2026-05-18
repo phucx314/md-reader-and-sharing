@@ -171,7 +171,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         .sort()
         .map((k) => ({
           title: k,
-          data: grouped[k].sort((a, b) => b.mtime - a.mtime),
+          data: grouped[k].sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0)),
         }));
       setDeviceSections(newSections);
     } catch (e) {
@@ -741,7 +741,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <View style={styles.fileDetails}>
                 <ThemedText type="label" numberOfLines={1}>{item.name.replace('.md', '')}</ThemedText>
                 <ThemedText type="caption" muted>
-                  {(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}
+                  {(item.size / 1024).toFixed(1)} KB · {item.mtime ? formatTime(item.mtime) : 'Unknown'}
                 </ThemedText>
               </View>
               <TouchableOpacity
