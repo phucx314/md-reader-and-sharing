@@ -17,6 +17,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { syncFilesWithFS, deleteFile as deleteFileFromStore } from '../utils/fileStore';
@@ -24,6 +25,7 @@ import { saveFile, generateUUID, getFileByName } from '../utils/fileStore';
 import { API_URL } from '../api/client';
 import { apiClient } from '../api/client';
 import axios from 'axios';
+import { scanMarkdownFiles, type DeviceMarkdownFile } from '../utils/deviceScan';
 
 import { ThemedView } from '../components/ThemedView';
 import { ThemedText } from '../components/ThemedText';
@@ -64,9 +66,22 @@ const formatTime = (ts: number) => {
   }
 };
 
+const toSafeLocalMdFilename = (raw: string) => {
+  const trimmed = String(raw || '').trim();
+  const base = trimmed.replace(/\\/g, '/').split('/').pop() || 'imported.md';
+  const noDocPrefix = base.includes(':') ? base.split(':').slice(1).join(':') : base;
+  const sanitized = noDocPrefix.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+  const finalName = sanitized || 'imported.md';
+  return finalName.toLowerCase().endsWith('.md') ? finalName : `${finalName}.md`;
+};
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const [activePage, setActivePage] = useState<'library' | 'device'>('library');
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [sections, setSections] = useState<{ title: string; data: FileInfo[] }[]>([]);
+  const [deviceFiles, setDeviceFiles] = useState<DeviceMarkdownFile[]>([]);
+  const [deviceSections, setDeviceSections] = useState<{ title: string; data: DeviceMarkdownFile[] }[]>([]);
+  const [isScanningDevice, setIsScanningDevice] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [shareStatusMap, setShareStatusMap] = useState<Record<string, { ever_shared: boolean; active_shared: boolean }>>({});
   const { colors, isDark, toggleTheme } = useTheme();
@@ -74,6 +89,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const [isFabOpen, setIsFabOpen] = useState(false);
   const fabAnim = React.useRef(new Animated.Value(0)).current;
+  const scanBarAnim = React.useRef(new Animated.Value(0)).current;
   const subFabExtendedAnim = React.useRef(new Animated.Value(1)).current;
   const subFabTimer = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -140,6 +156,53 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setLogoutConfirmVisible(false);
     logout();
   };
+
+  const loadDeviceFiles = async () => {
+    setIsScanningDevice(true);
+    try {
+      const scanned = await scanMarkdownFiles();
+      setDeviceFiles(scanned);
+      const grouped = scanned.reduce<Record<string, DeviceMarkdownFile[]>>((acc, item) => {
+        if (!acc[item.parentLabel]) acc[item.parentLabel] = [];
+        acc[item.parentLabel].push(item);
+        return acc;
+      }, {});
+      const newSections = Object.keys(grouped)
+        .sort()
+        .map((k) => ({
+          title: k,
+          data: grouped[k].sort((a, b) => b.mtime - a.mtime),
+        }));
+      setDeviceSections(newSections);
+    } catch (e) {
+      console.error(e);
+      setDeviceFiles([]);
+      setDeviceSections([]);
+    } finally {
+      setIsScanningDevice(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (!isScanningDevice) {
+      scanBarAnim.stopAnimation();
+      scanBarAnim.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(scanBarAnim, {
+        toValue: 1,
+        duration: 900,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+      scanBarAnim.stopAnimation();
+      scanBarAnim.setValue(0);
+    };
+  }, [isScanningDevice, scanBarAnim]);
 
   const loadFiles = async () => {
     try {
@@ -224,9 +287,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  useFocusEffect(useCallback(() => { loadFiles(); }, [token]));
+  useFocusEffect(useCallback(() => {
+    loadFiles();
+    loadDeviceFiles();
+  }, [token]));
 
-  const onRefresh = async () => { setRefreshing(true); await loadFiles(); setRefreshing(false); };
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadFiles(), loadDeviceFiles()]);
+    setRefreshing(false);
+  };
 
   const importFile = async () => {
     try {
@@ -384,6 +454,61 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setDeleteConfirmVisible(true);
   };
 
+  const importScannedFile = async (item: DeviceMarkdownFile) => {
+    try {
+      console.log('[DeviceImport] start', {
+        uri: item.uri,
+        name: item.name,
+        parentLabel: item.parentLabel,
+        isContentUri: item.uri.startsWith('content://'),
+      });
+      const body = item.uri.startsWith('content://')
+        ? await FileSystem.StorageAccessFramework.readAsStringAsync(item.uri)
+        : await FileSystem.readAsStringAsync(item.uri);
+      console.log('[DeviceImport] read done', { length: body.length });
+      if (!body.trim()) {
+        Toast.show({ position: 'bottom', type: 'error', text1: 'File is empty' });
+        return;
+      }
+
+      const dirInfo = await FileSystem.getInfoAsync(DIR_URI);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(DIR_URI, { intermediates: true });
+      }
+
+      let finalFilename = toSafeLocalMdFilename(item.name);
+      let counter = 1;
+      while (await getFileByName(finalFilename)) {
+        const stem = item.name.replace(/\.md$/i, '');
+        finalFilename = `${stem} (${counter}).md`;
+        counter += 1;
+      }
+
+      const newUri = `${DIR_URI}${finalFilename}`;
+      console.log('[DeviceImport] write target', { newUri, finalFilename });
+      await FileSystem.writeAsStringAsync(newUri, body);
+      const newFileId = generateUUID();
+      await saveFile({
+        id: newFileId,
+        filename: finalFilename,
+        uri: newUri,
+        createdAt: Date.now(),
+        origin: 'local',
+      });
+      await loadFiles();
+      console.log('[DeviceImport] success', { newFileId, finalFilename });
+      Toast.show({ position: 'bottom', type: 'success', text1: 'Imported to Library' });
+    } catch (error: any) {
+      console.error('[DeviceImport] failed', {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack,
+        error,
+      });
+      Toast.show({ position: 'bottom', type: 'error', text1: 'Import failed' });
+    }
+  };
+
   const executeDelete = async () => {
     if (fileToDelete) {
       try {
@@ -455,110 +580,183 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* ─── File list ────────────────────────────── */}
-      <View style={[styles.legendRow, { borderBottomColor: colors.border }]}>
-        <View style={styles.legendItem}>
-          <Ionicons name="download-outline" size={13} color={isDark ? '#9AE6B4' : '#166534'} />
-          <ThemedText type="caption" muted>Imported</ThemedText>
-        </View>
-        <View style={styles.legendItem}>
-          <Ionicons name="cloud-done-outline" size={13} color={colors.textMuted} />
-          <ThemedText type="caption" muted>Cloud saved</ThemedText>
-        </View>
-        <View style={styles.legendItem}>
-          <Ionicons name="share-social-outline" size={13} color={colors.success} />
-          <ThemedText type="caption" muted>Active Link</ThemedText>
-        </View>
-      </View>
-
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.uri}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={['#111']}
-            progressBackgroundColor={colors.primary}
+      {isScanningDevice ? (
+        <View style={[styles.scanProgressTrack, { backgroundColor: isDark ? '#2A2A2A' : '#E5E7EB' }]}>
+          <Animated.View
+            style={[
+              styles.scanProgressBar,
+              {
+                backgroundColor: colors.primary,
+                transform: [
+                  {
+                    translateX: scanBarAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-160, 420],
+                    }),
+                  },
+                ],
+              },
+            ]}
           />
-        }
-        contentContainerStyle={[styles.list, files.length === 0 && styles.listEmpty]}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyState}>
-            <ThemedText style={[styles.emptyEmoji]}>📄</ThemedText>
-            <ThemedText type="subtitle" style={{ marginBottom: 8 }}>No files yet</ThemedText>
-            <ThemedText muted style={{ textAlign: 'center' }}>
-              Tap the + button to create{'\n'}or import a markdown file.
-            </ThemedText>
-          </View>
-        )}
-        renderSectionHeader={({ section: { title } }) => (
-          <View style={styles.sectionHeader}>
-            <ThemedText type="label" style={{ fontFamily: 'SpaceGrotesk-Bold', color: colors.text }}>{title}</ThemedText>
-          </View>
-        )}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('Editor', { uri: item.uri, name: item.name, fileId: item.id })}
-          >
-            <ThemedView card style={styles.fileCard}>
-              {/* File icon badge */}
-              <View style={[styles.fileIconBadge, { backgroundColor: colors.primary, borderColor: colors.border }]}>
-                <Ionicons name="document-text" size={20} color="#111" />
-              </View>
+        </View>
+      ) : null}
 
-              <View style={styles.fileDetails}>
-                <View style={styles.fileTitleRow}>
-                  <ThemedText type="label" numberOfLines={1} style={{ flex: 1 }}>
-                    {item.name.replace('.md', '')}
-                  </ThemedText>
-                </View>
-                {(() => {
-                  const shareState = item.id ? shareStatusMap[item.id] : undefined;
-                  const wasEverShared = Boolean(shareState?.ever_shared);
-                  const isActiveShared = Boolean(shareState?.active_shared);
-                  const isImported = item.origin === 'imported';
-                  return (
-                    <View style={styles.metaRow}>
-                      <ThemedText type="caption" muted>
-                        {(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}
+      {activePage === 'library' && (
+        <>
+          {/* ─── File list ────────────────────────────── */}
+          <View style={[styles.legendRow, { borderBottomColor: colors.border }]}>
+            <View style={styles.legendItem}>
+              <Ionicons name="download-outline" size={13} color={isDark ? '#9AE6B4' : '#166534'} />
+              <ThemedText type="caption" muted>Imported</ThemedText>
+            </View>
+            <View style={styles.legendItem}>
+              <Ionicons name="cloud-done-outline" size={13} color={colors.textMuted} />
+              <ThemedText type="caption" muted>Cloud saved</ThemedText>
+            </View>
+            <View style={styles.legendItem}>
+              <Ionicons name="share-social-outline" size={13} color={colors.success} />
+              <ThemedText type="caption" muted>Active Link</ThemedText>
+            </View>
+          </View>
+
+          <SectionList
+            sections={sections}
+            keyExtractor={(item) => item.uri}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.primary}
+                colors={['#111']}
+                progressBackgroundColor={colors.primary}
+              />
+            }
+            contentContainerStyle={[styles.list, files.length === 0 && styles.listEmpty]}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyState}>
+                <ThemedText style={[styles.emptyEmoji]}>📄</ThemedText>
+                <ThemedText type="subtitle" style={{ marginBottom: 8 }}>No files yet</ThemedText>
+                <ThemedText muted style={{ textAlign: 'center' }}>
+                  Tap the + button to create{'\n'}or import a markdown file.
+                </ThemedText>
+              </View>
+            )}
+            renderSectionHeader={({ section: { title } }) => (
+              <View style={styles.sectionHeader}>
+                <ThemedText type="label" style={{ fontFamily: 'SpaceGrotesk-Bold', color: colors.text }}>{title}</ThemedText>
+              </View>
+            )}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('Editor', { uri: item.uri, name: item.name, fileId: item.id })}
+              >
+                <ThemedView card style={styles.fileCard}>
+                  {/* File icon badge */}
+                  <View style={[styles.fileIconBadge, { backgroundColor: colors.primary, borderColor: colors.border }]}>
+                    <Ionicons name="document-text" size={20} color="#111" />
+                  </View>
+
+                  <View style={styles.fileDetails}>
+                    <View style={styles.fileTitleRow}>
+                      <ThemedText type="label" numberOfLines={1} style={{ flex: 1 }}>
+                        {item.name.replace('.md', '')}
                       </ThemedText>
-                      <View style={styles.metaIconsRow}>
-                        {isImported ? (
-                          <Ionicons name="download-outline" size={14} color={isDark ? '#9AE6B4' : '#166534'} />
-                        ) : null}
-                        {wasEverShared ? (
-                          <Ionicons name="cloud-done-outline" size={14} color={colors.textMuted} />
-                        ) : null}
-                        {isActiveShared ? (
-                          <Ionicons name="share-social-outline" size={14} color={colors.success} />
-                        ) : null}
-                      </View>
                     </View>
-                  );
-                })()}
-              </View>
+                    {(() => {
+                      const shareState = item.id ? shareStatusMap[item.id] : undefined;
+                      const wasEverShared = Boolean(shareState?.ever_shared);
+                      const isActiveShared = Boolean(shareState?.active_shared);
+                      const isImported = item.origin === 'imported';
+                      return (
+                        <View style={styles.metaRow}>
+                          <ThemedText type="caption" muted>
+                            {(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}
+                          </ThemedText>
+                          <View style={styles.metaIconsRow}>
+                            {isImported ? (
+                              <Ionicons name="download-outline" size={14} color={isDark ? '#9AE6B4' : '#166534'} />
+                            ) : null}
+                            {wasEverShared ? (
+                              <Ionicons name="cloud-done-outline" size={14} color={colors.textMuted} />
+                            ) : null}
+                            {isActiveShared ? (
+                              <Ionicons name="share-social-outline" size={14} color={colors.success} />
+                            ) : null}
+                          </View>
+                        </View>
+                      );
+                    })()}
+                  </View>
 
-              <View style={[styles.fileActions, { marginLeft: 'auto' }]}>
-                <TouchableOpacity
-                  onPress={() => confirmDelete(item.id, item.uri, item.name)}
-                  style={[styles.deleteButton, { borderColor: colors.border }]}
-                  accessibilityLabel={`Delete ${item.name}`}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="trash-outline" size={18} color={colors.error} />
-                </TouchableOpacity>
+                  <View style={[styles.fileActions, { marginLeft: 'auto' }]}>
+                    <TouchableOpacity
+                      onPress={() => confirmDelete(item.id, item.uri, item.name)}
+                      style={[styles.deleteButton, { borderColor: colors.border }]}
+                      accessibilityLabel={`Delete ${item.name}`}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
+                </ThemedView>
+              </TouchableOpacity>
+            )}
+          />
+        </>
+      )}
+
+      {activePage === 'device' && (
+        <SectionList
+          sections={deviceSections}
+          keyExtractor={(item) => item.uri}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={['#111']}
+              progressBackgroundColor={colors.primary}
+            />
+          }
+          contentContainerStyle={[styles.list, deviceFiles.length === 0 && styles.listEmpty]}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyState}>
+              <ThemedText type="subtitle" style={{ marginBottom: 8 }}>No scanned markdown files</ThemedText>
+              <ThemedText muted style={{ textAlign: 'center' }}>
+                Add scan folders in Settings, then pull to refresh.
+              </ThemedText>
+            </View>
+          )}
+          renderSectionHeader={({ section: { title } }) => (
+            <View style={styles.sectionHeader}>
+              <ThemedText type="label" style={{ fontFamily: 'SpaceGrotesk-Bold', color: colors.text }}>{title}</ThemedText>
+            </View>
+          )}
+          renderItem={({ item }) => (
+            <ThemedView card style={styles.fileCard}>
+              <View style={[styles.fileIconBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Ionicons name="document-outline" size={20} color={colors.text} />
               </View>
+              <View style={styles.fileDetails}>
+                <ThemedText type="label" numberOfLines={1}>{item.name.replace('.md', '')}</ThemedText>
+                <ThemedText type="caption" muted>
+                  {(item.size / 1024).toFixed(1)} KB · {formatTime(item.mtime)}
+                </ThemedText>
+              </View>
+              <TouchableOpacity
+                style={[styles.importDeviceBtn, { borderColor: colors.border, backgroundColor: colors.primary }]}
+                onPress={() => importScannedFile(item)}
+              >
+                <ThemedText type="caption" style={{ fontFamily: 'SpaceGrotesk-Bold', color: '#111' }}>Import</ThemedText>
+              </TouchableOpacity>
             </ThemedView>
-          </TouchableOpacity>
-        )}
-      />
+          )}
+        />
+      )}
 
       {/* ─── Expandable FAB ──────────────────────── */}
-      <View style={styles.fabContainer}>
+      {activePage === 'library' && <View style={styles.fabContainer}>
         {/* Import Link Button */}
         <Animated.View style={[styles.subFabRow, { transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -195] }) }, { scale: fabAnim }] }]}>
           <TouchableOpacity onPress={() => { closeFab(); setImportUrlModalVisible(true); }} activeOpacity={0.85}>
@@ -602,18 +800,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           onPressIn={handleFabPressIn}
           onPressOut={handleFabPressOut}
         >
-          <Animated.View
-            style={[
-              styles.fabShadow,
-              {
-                backgroundColor: colors.shadow,
-                opacity: fabPressedAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 0],
-                }),
-              },
-            ]}
-          />
           <Animated.View style={[styles.fab, { backgroundColor: colors.primary, borderColor: colors.border }, {
             transform: [
               {
@@ -634,6 +820,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Ionicons name="add" size={30} color="#111" />
           </Animated.View>
         </Pressable>
+      </View>}
+
+      <View style={[styles.bottomSwitchIsland, { borderColor: colors.border, backgroundColor: colors.card }]}>
+        <TouchableOpacity
+          style={[styles.bottomSwitchBtn, activePage === 'library' && { backgroundColor: colors.primary }]}
+          onPress={() => setActivePage('library')}
+        >
+          <ThemedText type="caption" style={{ fontFamily: 'SpaceGrotesk-Bold', color: activePage === 'library' ? '#111' : colors.text }}>
+            Library
+          </ThemedText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.bottomSwitchBtn, activePage === 'device' && { backgroundColor: colors.primary }]}
+          onPress={() => setActivePage('device')}
+        >
+          <ThemedText type="caption" style={{ fontFamily: 'SpaceGrotesk-Bold', color: activePage === 'device' ? '#111' : colors.text }}>
+            Device
+          </ThemedText>
+        </TouchableOpacity>
       </View>
 
       {/* ─── Modals ──────────────────────── */}
@@ -716,6 +921,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(0,0,0,0)', `${colors.background}99`, `${colors.background}FA`, colors.background]}
+        locations={[0, 0.35, 0.75, 1]}
+        style={styles.bottomFadeWrap}
+      />
     </SafeAreaView>
   );
 };
@@ -742,6 +954,14 @@ const styles = StyleSheet.create({
   },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
   iconButton: { marginLeft: 8, padding: 6 },
+  scanProgressTrack: {
+    height: 2,
+    overflow: 'hidden',
+  },
+  scanProgressBar: {
+    width: 160,
+    height: 2,
+  },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -755,7 +975,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  list: { padding: 16, paddingBottom: 100 },
+  list: { padding: 16, paddingBottom: 170 },
   listEmpty: { flex: 1 },
   sectionHeader: {
     paddingVertical: 10,
@@ -802,6 +1022,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  importDeviceBtn: {
+    borderWidth: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
   fileCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -833,6 +1058,7 @@ const styles = StyleSheet.create({
     height: 60,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 4,
   },
   mainFabWrap: {
     position: 'absolute',
@@ -843,15 +1069,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 6,
     alignItems: 'flex-end',
-  },
-  fabShadow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    transform: [{ translateX: 4 }, { translateY: 4 }],
   },
   fab: {
     position: 'absolute',
@@ -936,5 +1153,32 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bottomSwitchIsland: {
+    position: 'absolute',
+    left: 28,
+    right: 96,
+    bottom: 28,
+    height: 60,
+    borderWidth: 2,
+    borderRadius: 30,
+    padding: 4,
+    flexDirection: 'row',
+    gap: 4,
+    zIndex: 3,
+  },
+  bottomSwitchBtn: {
+    flex: 1,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomFadeWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 140,
+    zIndex: 1,
   },
 });
