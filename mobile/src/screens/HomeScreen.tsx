@@ -161,6 +161,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setIsScanningDevice(true);
     try {
       const scanned = await scanMarkdownFiles();
+      console.log('[DeviceScan] loadDeviceFiles scanned count=', scanned.length);
       setDeviceFiles(scanned);
       const grouped = scanned.reduce<Record<string, DeviceMarkdownFile[]>>((acc, item) => {
         if (!acc[item.parentLabel]) acc[item.parentLabel] = [];
@@ -174,8 +175,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           data: grouped[k].sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0)),
         }));
       setDeviceSections(newSections);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error('[DeviceScan] loadDeviceFiles failed', {
+        message: e?.message,
+        code: e?.code,
+        stack: e?.stack,
+        error: e,
+      });
       setDeviceFiles([]);
       setDeviceSections([]);
     } finally {
@@ -575,7 +581,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Ionicons name={isDark ? 'sunny' : 'moon'} size={22} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => token ? setProfileMenuVisible(true) : navigation.navigate('Auth')}
+            onPress={() => setProfileMenuVisible(true)}
             style={[styles.iconButton, { padding: 4 }]}
             accessibilityLabel={token ? 'Profile' : 'Log in'}
           >
@@ -845,26 +851,42 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       </View>
 
       {/* ─── Modals ──────────────────────── */}
-      <Modal visible={profileMenuVisible} transparent animationType="fade">
+      <Modal visible={profileMenuVisible} transparent animationType="slide">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setProfileMenuVisible(false)}>
-          <View style={[styles.profileMenu, { backgroundColor: colors.card, borderColor: colors.border, shadowColor: isDark ? 'transparent' : colors.shadow }]}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); navigation.navigate('Profile'); }}>
-              <Ionicons name="person-outline" size={20} color={colors.text} />
-              <ThemedText style={styles.menuText}>Profile</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); navigation.navigate('Share', {}); }}>
-              <Ionicons name="link-outline" size={20} color={colors.text} />
-              <ThemedText style={styles.menuText}>My Links</ThemedText>
-            </TouchableOpacity>
+          <View style={[styles.profileSheet, { backgroundColor: colors.card, borderColor: colors.border, shadowColor: isDark ? 'transparent' : colors.shadow }]}>
+            <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
+              <ThemedText type="subtitle" style={{ fontFamily: 'SpaceGrotesk-Bold', fontSize: 20, lineHeight: 26 }}>
+                {token ? 'Account' : 'Menu'}
+              </ThemedText>
+            </View>
+            {token ? (
+              <>
+                <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); navigation.navigate('Profile'); }}>
+                  <Ionicons name="person-outline" size={20} color={colors.text} />
+                  <ThemedText style={styles.menuText}>Profile</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); navigation.navigate('Share', {}); }}>
+                  <Ionicons name="link-outline" size={20} color={colors.text} />
+                  <ThemedText style={styles.menuText}>My Links</ThemedText>
+                </TouchableOpacity>
+              </>
+            ) : null}
             <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); navigation.navigate('Settings'); }}>
               <Ionicons name="settings-outline" size={20} color={colors.text} />
               <ThemedText style={styles.menuText}>Settings</ThemedText>
             </TouchableOpacity>
             <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); setLogoutConfirmVisible(true); }}>
-              <Ionicons name="log-out-outline" size={20} color={colors.error} />
-              <ThemedText style={[styles.menuText, { color: colors.error }]}>Log Out</ThemedText>
-            </TouchableOpacity>
+            {token ? (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); setLogoutConfirmVisible(true); }}>
+                <Ionicons name="log-out-outline" size={20} color={colors.error} />
+                <ThemedText style={[styles.menuText, { color: colors.error }]}>Log Out</ThemedText>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); navigation.navigate('Auth'); }}>
+                <Ionicons name="log-in-outline" size={20} color={colors.text} />
+                <ThemedText style={styles.menuText}>Log In</ThemedText>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -1096,18 +1118,24 @@ const styles = StyleSheet.create({
   menuOverlay: {
     flex: 1,
     backgroundColor: 'transparent',
+    justifyContent: 'flex-end',
   },
-  profileMenu: {
-    position: 'absolute',
-    top: 60,
-    right: 16,
-    width: 200,
+  profileSheet: {
+    marginHorizontal: 0,
+    marginBottom: 0,
     borderWidth: 2,
     borderRadius: 0,
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
     shadowRadius: 0,
+    elevation: 0,
     paddingVertical: 8,
+  },
+  sheetHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    marginBottom: 4,
+    borderBottomWidth: 2,
   },
   menuItem: {
     flexDirection: 'row',

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import { getAndroidDocumentMeta } from './androidDocumentMeta';
 
 const SCAN_FOLDERS_KEY = '@device_scan_folders_v1';
 const SCAN_RECURSIVE_KEY = '@device_scan_recursive_all_v1';
@@ -93,33 +94,68 @@ export const scanMarkdownFiles = async (): Promise<DeviceMarkdownFile[]> => {
     const entries = await FileSystem.StorageAccessFramework.readDirectoryAsync(dirUri);
     console.log(`[DeviceScan] folder=${folder.label} depth=${depth} entries=${entries.length}`);
     for (const entryUri of entries) {
-      const info = await FileSystem.getInfoAsync(entryUri);
-      const name = getDisplayNameFromEntryUri(entryUri);
-      if ((info as any).isDirectory) {
-        if (recursiveAll) {
-          await walk(folder, entryUri, depth + 1);
+      try {
+        const nativeMeta = await getAndroidDocumentMeta(entryUri);
+        if (nativeMeta) {
+          console.log('[DeviceScan] nativeMeta', {
+            uri: entryUri,
+            displayName: nativeMeta.displayName,
+            size: nativeMeta.size,
+            lastModified: nativeMeta.lastModified,
+            isDirectory: nativeMeta.isDirectory,
+            mimeType: nativeMeta.mimeType,
+          });
         }
+        const name = getDisplayNameFromEntryUri(entryUri);
+        if (nativeMeta?.isDirectory === true) {
+          if (recursiveAll) {
+            await walk(folder, entryUri, depth + 1);
+          }
+          continue;
+        }
+        const info = nativeMeta ? null : await FileSystem.getInfoAsync(entryUri);
+        if (!nativeMeta && (info as any)?.isDirectory) {
+          if (recursiveAll) {
+            await walk(folder, entryUri, depth + 1);
+          }
+          continue;
+        }
+        if (!name.toLowerCase().endsWith('.md')) continue;
+        all.push({
+          uri: entryUri,
+          name: nativeMeta?.displayName || name,
+          parentUri: folder.uri,
+          parentLabel: folder.label,
+          size: nativeMeta?.size ?? (info?.exists ? ((info as any).size ?? 0) : 0),
+          mtime:
+            nativeMeta?.lastModified ??
+            (info?.exists
+              ? (((info as any).modificationTime ?? (info as any).mtime ?? (info as any).lastModified ?? null) as number | null)
+              : null),
+        });
+      } catch (entryError: any) {
+        console.warn('[DeviceScan] entry skipped', {
+          folder: folder.label,
+          entryUri,
+          message: entryError?.message,
+          code: entryError?.code,
+        });
         continue;
       }
-      if (!name.toLowerCase().endsWith('.md')) continue;
-      all.push({
-        uri: entryUri,
-        name,
-        parentUri: folder.uri,
-        parentLabel: folder.label,
-        size: info.exists ? ((info as any).size ?? 0) : 0,
-        mtime: info.exists
-          ? (((info as any).modificationTime ?? (info as any).mtime ?? (info as any).lastModified ?? null) as number | null)
-          : null,
-      });
     }
   };
 
   for (const folder of folders) {
     try {
       await walk(folder, folder.uri, 0);
-    } catch (error) {
-      console.error('[DeviceScan] scan folder failed', { folder, error });
+    } catch (error: any) {
+      console.error('[DeviceScan] scan folder failed', {
+        folder,
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack,
+        error,
+      });
       continue;
     }
   }

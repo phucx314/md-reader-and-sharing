@@ -21,6 +21,7 @@
 - [x] Fixed scanned-file import path for Android SAF (`content://`) reads.
 
 ## Next Fixes (High Priority)
+- [ ] Implement native Android module `SafMetadataModule` after `expo prebuild` to return reliable SAF `lastModified`/`size`/`displayName`.
 - [ ] Add user-facing warning/help text for SAF-restricted folders (Android scoped storage limitation).
 - [ ] Define and implement backend upload-only endpoint if product requires “import => cloud upload immediately” without generating a share link.
 - [ ] Persist Device scan index for larger folder sets (current MVP scans on demand).

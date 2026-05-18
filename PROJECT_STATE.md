@@ -38,6 +38,12 @@ Ship a mobile markdown reader/editor with:
 - `mobile/src/constants/` is sparse (only `theme.ts`); other config constants (API URL, limits) are hardcoded or inline.
 
 ## Recent Changes
+- 2026-05-18: Local Android toolchain fixed for native build: switched to JDK 21, installed Android SDK command-line tools + required platform/build-tools, added `mobile/android/local.properties`, and verified `:app:compileDebugKotlin` succeeds.
+- 2026-05-18: Ran `expo prebuild -p android`; generated `mobile/android` native project.
+- 2026-05-18: Implemented Android native SAF metadata module (`SafMetadataModule` + `SafMetadataPackage`) and registered it in `MainApplication`.
+- 2026-05-18: Created branch `feat/android-file-metadata-saf` for SAF metadata work.
+- 2026-05-18: Added plan `implement plans/12-20260518-android-saf-metadata-plan.vi.md`.
+- 2026-05-18: Added Android SAF metadata bridge layer (`mobile/src/utils/androidDocumentMeta.ts`) and integrated it into device scan fallback chain.
 - 2026-05-18: Device scan now supports recursive “scan all subfolders” toggle from Settings.
 - 2026-05-18: Fixed scanned filename normalization (SAF document IDs no longer leak full path into local filename), preventing import write failures.
 - 2026-05-18: Fixed Device->Library import for scanned files by using SAF read API for `content://` URIs and ensuring library directory creation before write.
