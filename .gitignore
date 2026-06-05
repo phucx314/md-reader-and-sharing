@@ -51,6 +51,7 @@ desktop/dist/
 desktop/*.tsbuildinfo
 desktop/vite.config.js
 desktop/vite.config.d.ts
+desktop/src-tauri/gen/
 desktop/src-tauri/target/
 
 # ─── Editor & OS ─────────────────────────────────────────────────────────────
