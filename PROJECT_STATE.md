@@ -1,13 +1,13 @@
 # Project State
 
 ## Current Goal
-Ship a mobile markdown reader/editor with:
-- local file management
-- share-link backend
-- explain-term (LLM) flow from preview selection
+Ship a mobile markdown reader/editor (Expo RN + FastAPI), plus a Linux desktop variant (Tauri + React) for offline single-file use:
+- mobile: local file management, share-link backend, explain-term (LLM) flow
+- desktop (NEW): Tauri AppImage on Ubuntu/Debian x86_64, "Open With" integration for .md files, core edit+preview, dark/light theme, talks to the hosted FastAPI backend (no local backend)
 
 ## Current Status
 - Working implementation across `mobile/` (Expo RN + TypeScript) and `backend/` (FastAPI + SQLModel + SQLite).
+- `desktop/` Linux variant scaffolded with Tauri 2 + React + TypeScript; frontend build, Rust `cargo check`, and manual AppImage packaging pass locally.
 - App includes editor/preview, share flow, mermaid/table viewers, and explain-term viewer with LLM chat.
 - Navigation: React Navigation stack (`AppNavigator.tsx`), auth-gated via `AuthContext`.
 - Theme: dark/light toggle through `ThemeContext`, brutalist UI component library (`BrutalButton`, `BrutalInput`, `BrutalSwitch`, `ConfirmModal`).
@@ -16,6 +16,8 @@ Ship a mobile markdown reader/editor with:
 - Tests: basic Jest setup with component smoke tests (`mobile/__tests__/`); no API integration tests yet.
 - Home now has `Library` and `Device` sub views (MVP split).
 - Device scan support added (Android SAF folder selection + markdown scan utility + Settings management).
+- Desktop app supports single-file open/save, edit/preview/split view, theme toggle, CLI/open-with file path handling, and recent-files persistence.
+- Desktop AppImage artifact verified at `desktop/src-tauri/target/release/bundle/appimage/MDReader_0.1.0_amd64.AppImage`.
 - Agent memory files: `CLAUDE.md`, `AGENTS.md`, `DECISIONS.md`, `PROJECT_STATE.md`, `TODO.md` for cross-agent context sharing.
 - Empty directories: `.agents/`, `.codex/`, `mobile/.agents/`, `mobile/.codex/` (scaffolding for agent integration), `mobile/src/types/` (no type definitions extracted yet).
 
@@ -63,3 +65,6 @@ Ship a mobile markdown reader/editor with:
 - 2026-05-17: Share/View/Cleanup flows now use provider-based object IO with backward compatibility for legacy local records.
 - 2026-05-17: Added `DATABASE_URL` support and Postgres URL normalization (`postgresql+psycopg://`).
 - 2026-05-17: Expanded `backend/.env.example` with DB, storage, and LLM-related env keys.
+- 2026-06-05: Desktop app empty state now includes recent files (persisted in `localStorage`) and desktop `.gitignore` now excludes TS build artifacts.
+- 2026-06-05: Built Linux AppImage successfully via `desktop/scripts/package-appimage.sh` after bypassing Tauri's failing `linuxdeploy` bundle path; `desktop/scripts/build.sh` now uses `tauri build --no-bundle` + manual package step.
+- 2026-06-05: Fixed AppImage runtime launch for WebKitGTK by packaging helper processes under `usr/libexec`, mirroring `libexec`/`lib` at AppDir root, and `cd`-ing into the AppImage root from `AppRun` before launching `md-reader`.
