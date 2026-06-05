@@ -19,8 +19,12 @@
 - [x] Added scan-folder management in Settings and Android SAF markdown scanning utility.
 - [x] Added Device-tab action to import scanned markdown into Library.
 - [x] Fixed scanned-file import path for Android SAF (`content://`) reads.
+- [x] Desktop Linux MVP scaffolded under `desktop/` (Tauri 2 + React) with open/save, edit/preview/split view, theme toggle, and recent files.
 
 ## Next Fixes (High Priority)
+- [x] Implement native Android module `SafMetadataModule` after `expo prebuild` to return reliable SAF `lastModified`/`size`/`displayName` (done on `feat/android-file-metadata-saf`).
+- [x] Build Linux desktop variant (Tauri + Vite + React) under `desktop/`, AppImage bundle, "Open With" .desktop for `text/markdown`.
+- [ ] Verify Linux desktop install flow end-to-end on target distro: `scripts/install.sh` and right-click "Open With" registration after local AppImage build.
 - [ ] Add user-facing warning/help text for SAF-restricted folders (Android scoped storage limitation).
 - [ ] Define and implement backend upload-only endpoint if product requires “import => cloud upload immediately” without generating a share link.
 - [ ] Persist Device scan index for larger folder sets (current MVP scans on demand).

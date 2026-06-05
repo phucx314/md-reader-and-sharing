@@ -45,12 +45,21 @@ mobile/android/
 mobile/.env
 mobile/.env.local
 
+# ─── Node / Desktop (Tauri) ─────────────────────────────────────────────────
+desktop/node_modules/
+desktop/dist/
+desktop/*.tsbuildinfo
+desktop/vite.config.js
+desktop/vite.config.d.ts
+desktop/src-tauri/target/
+
 # ─── Editor & OS ─────────────────────────────────────────────────────────────
 .vscode/settings.json
 .DS_Store
 *.pem
 *.key
 Thumbs.db
+session-ses_*.md
 implement plans/
 sample/
 backlogs/
